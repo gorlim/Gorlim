@@ -1,4 +1,4 @@
-package gorlim
+package gorlim-git
 
 import (
 	"fmt"
