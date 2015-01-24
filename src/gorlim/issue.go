@@ -1,13 +1,13 @@
 package gorlim
 
 type Issue struct {
-  id int
-  state bool
-  assignee string
-  milestone string
-  title string
-  description string
-  labels []string
-  comments []string
+  Id int
+  Opened bool
+  Assignee string
+  Milestone string
+  Title string
+  Description string
+  Labels []string
+  Comments []string
 }
 
