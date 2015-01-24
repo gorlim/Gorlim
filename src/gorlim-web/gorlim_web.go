@@ -18,10 +18,14 @@ const GH_SUFFIX = "/auth/github"
 const PROJECTS_SUFFIX = "/projects"
 const ADD_SUFFIX = "/add_project"
 
+const DB_FILE = "./test.db"
+
+var db storage.Storage
+
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
-	db, err := storage.Create("./test.db")
+	db, err := storage.Create(DB_FILE)
 	if err != nil {
 		log.Fatal("Create: ", err)
 	}
@@ -99,6 +103,7 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 		user, _, err := client.Users.Get("")
 		fmt.Println(err)
 		fmt.Printf("%#v %#v\n", values.Get("access_token"), user)
+		db.SaveGithubAuth(*user.Login, code)
 	}
 	http.Redirect(w, r, "/repositories.html", http.StatusFound)
 }
