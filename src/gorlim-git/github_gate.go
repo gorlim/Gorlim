@@ -1,4 +1,4 @@
-package gorlim-git
+package gorlim
 
 import (
 	"fmt"
@@ -42,7 +42,24 @@ func (t *AuthenticatedTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func getIssues(accessToken, date, repo string) []github.issue {
+func getGithubIssues(owner, repo, accessToken, date string) ([]github.Issue, int, error) {
+	if date == "" {
+		date = "Sat, 24 Jan 2015 00:00:00 GMT"
+	}
+	t := &AuthenticatedTransport{
+		AccessToken: accessToken,
+		Date:        date,
+	}
+	client := github.NewClient(t.Client())
+	client.BaseURL, _ = url.Parse(fmt.Sprintf("https://api.github.com/repos/%v/%v", owner, repo))
+	ilo := &github.IssueListOptions{}
+	issuesService := client.Issues
+	issues, resp, err := issuesService.List(true, ilo)
+
+	return issues, resp.StatusCode, err
+}
+
+func getGithubIssueComments(owner, repo, accessToken, date string, gIssue github.Issue) ([]github.IssueComment, int, error) {
 	if date == "" {
 		date = "Sat, 24 Jan 2015 00:00:00 GMT"
 	}
@@ -52,13 +69,49 @@ func getIssues(accessToken, date, repo string) []github.issue {
 	}
 	client := github.NewClient(t.Client())
 	client.BaseURL, _ = url.Parse("https://api.github.com/repos/" + repo)
-	ilo := &github.IssueListOptions{}
+	clo := &github.IssueListCommentsOptions{}
 	issuesService := client.Issues
-	issues, resp, err := issuesService.List(true, ilo)
+	comments, resp, err := issuesService.ListComments(owner, repo, *gIssue.Comments, clo)
 
-	if err != nil {
-		fmt.Printf("error: %#v %#v\n\n", err, resp)
-	} else {
-		return issues
+	return comments, resp.StatusCode, err
+}
+
+func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) gorlim.Issue {
+	labelAmount := len(gIssue.Labels)
+	labels := make([]string, labelAmount)
+	for i := 0; i < labelAmount; i++ {
+		labels[i] = gIssue.Labels[i].Name
 	}
+	commentAmount := len(gComments)
+	comments := make([]string, commentAmount)
+	for i := 0; i < commentAmount; i++ {
+		comments[i] = gComments[i].Body
+	}
+	result := gorlim.Issue{
+		Id:          gIssue.Number,
+		Opened:      gIssue.State == "opened",
+		Assignee:    gIssue.Assignee,
+		Milestone:   gIssue.Milestone.Title,
+		Title:       gIssue.Title,
+		Description: gComments[0].Body,
+		Labels:      labels,
+		Comments:    comments,
+	}
+	return result
+}
+
+func GetIssues(owner, repo, accessToken, date string) []gorlim.Issue {
+	gIssues, _, err := getGithubIssues(owner, repo, accessToken, date)
+	if err != nil {
+		panic(err)
+	}
+	iss := make([]gorlim.Issue, len(gIssues))
+	for i := 0; i < len(gIssues); i++ {
+		comments, _, err := getGithubIssueComments(owner, repo, accessToken, date, gIssues[i])
+		if err != nil {
+			panic(err)
+		}
+		iss[i] = convertGithubIssue(gIssues[i], comments)
+	}
+	return iss
 }
