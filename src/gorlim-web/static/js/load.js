@@ -15,8 +15,10 @@ function getAll() {
 		var length = array.length;
 		for (var i = 0 ; i < length; i++) {
 		  var li = document.createElement('li');
-			li.className = li.className + " list-group-item";
-			li.innerHTML = array[i].Origin;
+			li.className = li.className + " list-group-item text-left";
+			var text = document.createElement('div');
+			text.innerHTML = array[i].Origin;
+			li.appendChild(text);
 			list.appendChild(li);
 		}
 		filter();
@@ -35,10 +37,10 @@ function create(repo) {
 			return;
 		}
 
+    var err = document.getElementById('myError')
+    err.style.visibility = (this.status != 200) ? "visible" : "hidden"
+		err.innerHTML = this.responseText
 		if (this.status != 200) {
-			var err = document.getElementById('myError')
-			err.style.visibility = "visible"
-			err.innerHTML = this.responseText
 			return
 		}
 		$('#myModal').modal('hide')
@@ -51,8 +53,8 @@ function filter() {
 	var value = document.getElementById('search_input').value.toLowerCase()
 	var nodes = document.getElementById('search_list').childNodes
   var length = nodes.length
-	for(var i=0; i<nodes.length; i++) {
-		var visible = nodes[i].innerHTML.toLowerCase().indexOf(value) >= 0;
+	for(var i = 0; i < nodes.length; i++) {
+		var visible = nodes[i].childNodes[0].innerHTML.toLowerCase().indexOf(value) >= 0;
 		nodes[i].style.display = visible ? "block" : "none";
 	}
 }

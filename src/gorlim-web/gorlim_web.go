@@ -26,30 +26,29 @@ func main() {
 	http.HandleFunc(ADD_SUFFIX, func(w http.ResponseWriter, r *http.Request) {
 		text, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			prettyError(w, err.Error())
 			return
 		}
 		values, err := url.ParseQuery(string(text))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			prettyError(w, err.Error())
 			return
 		}
 		myType := values.Get("type")
 		if myType != "github" {
-			http.Error(w, "Please enter valid type", http.StatusInternalServerError)
+			prettyError(w, "Please enter valid type")
 			return
 		}
 		repo := values.Get("repo")
 		if repo == "" {
-			http.Error(w, "There is no such "+myType+" repository", http.StatusInternalServerError)
+			prettyError(w, "There is no such "+myType+" repository")
 			return
 		}
 		err = (*db).AddRepo(myType, repo, "lalala")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			prettyError(w, err.Error())
 			return
 		}
-		fmt.Println(values)
 	})
 	http.HandleFunc(PROJECTS_SUFFIX, func(w http.ResponseWriter, r *http.Request) {
 		needle := ""
@@ -58,12 +57,12 @@ func main() {
 		}
 		repos, err := (*db).GetRepos(needle)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			prettyError(w, err.Error())
 			return
 		}
 		js, err := json.Marshal(repos)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			prettyError(w, err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -93,4 +92,8 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(string(contents))
 	}
 	http.Redirect(w, r, "/repositories.html", http.StatusFound)
+}
+
+func prettyError(w http.ResponseWriter, text string) {
+	http.Error(w, "<b>Ooops.</b> "+text, http.StatusInternalServerError)
 }
