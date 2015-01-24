@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"code.google.com/p/goauth2/oauth"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-github/github"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -89,7 +91,14 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 		defer resp.Body.Close()
 		contents, _ := ioutil.ReadAll(resp.Body)
 
-		fmt.Println(string(contents))
+		values, err := url.ParseQuery(string(contents))
+		t := &oauth.Transport{
+			Token: &oauth.Token{AccessToken: values.Get("access_token")},
+		}
+		client := github.NewClient(t.Client())
+		user, _, err := client.Users.Get("")
+		fmt.Println(err)
+		fmt.Printf("%#v %#v\n", values.Get("access_token"), user)
 	}
 	http.Redirect(w, r, "/repositories.html", http.StatusFound)
 }
