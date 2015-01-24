@@ -42,7 +42,7 @@ func (t *AuthenticatedTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func getIssues(accessToken, date, repo string) []github.issues {
+func getIssues(accessToken, date, repo string) []github.issue {
 	if date == "" {
 		date = "Sat, 24 Jan 2015 00:00:00 GMT"
 	}
