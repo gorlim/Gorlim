@@ -2,9 +2,24 @@ package gorlim
 
 import "os"
 import "time"
-//import "fmt"
+import "syscall"
 
-func SubscribeToPushEvent(pipe string, notify chan<- int) {
+var pushevent chan int
+
+func GetPushListener() <-chan int {
+  if pushevent == nil {
+      pushevent = make(chan int, 16) // TODO buffer size
+      syscall.Mkfifo(getPushPipeName(), 0666)
+        subscribeToPushEvent(getPushPipeName(), pushevent)
+    }
+    return pushevent
+}
+
+func getPushPipeName() string {
+    return os.Getenv("HOME") +  "/syncpipes/pushntfifo"
+}
+
+func subscribeToPushEvent(pipe string, notify chan<- int) {
 	//fmt.Println("Read byte")
 	f, _ := os.Open(pipe)
   go func() {

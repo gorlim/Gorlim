@@ -17,6 +17,8 @@ func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryIn
 
 func (sm *SyncManager) InitGetRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface) {
 	repo.Update("initial commit", make([]Issue, 0)) // TBD - place to fetch Issues from web
+
+	// TBD: good optimization would be to ask repo for which issues were modified since the last known commit
 }
 
 func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {

@@ -3,34 +3,25 @@ package gorlim
 import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
-import "syscall"
 import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
+//import "os/exec"
 
-type IssueRepositoryInterface interface {
-	GetIssue(id int) (Issue, bool)
-	GetIssues() []Issue
-	Update(string, []Issue) 
-	Id() int
-	Path() string
-	//PushEvent() <-chan string // TODO: maybe it would be better to have push event for every repo instead of global one
-}
-
-type IssueRepository struct {
+type issueRepository struct {
    id int
    path string
-   repo *git.Repository
 }
 
-func (r *IssueRepository) initialize (repoRoot string, id int) {
+func (r *issueRepository) initialize (repoRoot string, id int) {
 	r.id = id
 	r.path = repoRoot + "/" + "issues" + strconv.Itoa(id)
 	// create physical repo
-	r.repo, _ = git.InitRepository(r.path,  false)
-	// setup hooks pipe and subscribe to it
-    pipeName := os.Getenv("HOME") + "/pushntfifo" // TODO hardcoded
+	repo, _ := git.InitRepository(r.path,  false)
+	repo.Free()
+	// configure
+	setIgnoreDenyCurrentBranch(r.path) // allow push to non-bare repo
 	// setup pre-receive hook
 	pre, _ := os.Create(r.path + ".git/hooks/pre-receive")
     defer pre.Close()
@@ -42,18 +33,45 @@ func (r *IssueRepository) initialize (repoRoot string, id int) {
     defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
-	post.WriteString("echo " + strconv.Itoa(id) + " >" + pipeName)
+	post.WriteString("echo " + strconv.Itoa(id) + " >" + getPushPipeName())
 	return 
 }
 
-func (r *IssueRepository) GetIssue(id int) (Issue, bool) {
+func setIgnoreDenyCurrentBranch(rpath string) {
+	// this is an ugly hack to add config record - git.Config interfaces didn't work for me... TBD...
+	cfgpath := rpath + "/.git/config"
+    file, err := os.Open(cfgpath)
+    if err != nil {
+    	panic (err)
+    } 
+    content := readTextFile(file)
+    file.Close()
+    file, err = os.OpenFile(cfgpath, os.O_WRONLY, 0666)
+    if err != nil {
+    	panic (err)
+    } 
+    content = append(content, "\n[receive]")
+    content = append(content, "        denyCurrentBranch = ignore\n")
+    for _, str := range content {
+       _, err := file.WriteString(str + "\n")
+           if err != nil {
+    	panic (err)
+    } 
+       fmt.Println(str)
+    }
+    file.Close()
+}
+
+func (r *issueRepository) GetIssue(id int) (Issue, bool) {
 	panic("Repository:GetIssue not implemented")
 }
 
-func (r *IssueRepository) GetIssues() []Issue {
-	repo := r.repo
+func (r *issueRepository) GetIssues() []Issue {
+   repo, _ := git.OpenRepository(r.path)
+   defer repo.Free()
 
-    repo.CheckoutHead(nil) // sync local dir 
+    copts := &git.CheckoutOpts{ Strategy : git.CheckoutForce }
+    repo.CheckoutHead(copts) // sync local dir 
 
     idx, err := repo.Index()
     if err != nil {
@@ -69,7 +87,7 @@ func (r *IssueRepository) GetIssues() []Issue {
 		path := ientry.Path
 		split := strings.Split(path, "/")
 		issue := Issue { Opened : split[0] == "open", Milestone : split[1], Assignee : split[2][1:] }
-		id := split[3][1:]
+		id := split[3]
 		issue.Id, _ = strconv.Atoi(id)
 		file, err := os.OpenFile(r.path + "/" + path, os.O_RDONLY, 0666)
 		if err != nil {
@@ -210,12 +228,13 @@ func getIssueDir(issue Issue) string {
 }
 
 func getIssueFileName(issue Issue) string {
-	return "#" + strconv.Itoa(issue.Id)
+	return strconv.Itoa(issue.Id)
 }
 
-func (r *IssueRepository) Update(message string, issues []Issue) {  
-   repo := r.repo
-
+func (r *issueRepository) Update(message string, issues []Issue) {  
+   repo, _ := git.OpenRepository(r.path)
+   defer repo.Free()
+   
    repo.CheckoutHead(nil) // sync local dir 
 
    idx, err := repo.Index()
@@ -281,31 +300,10 @@ func (r *IssueRepository) Update(message string, issues []Issue) {
     }
 }
 
-func (r *IssueRepository) Id() int {
+func (r *issueRepository) Id() int {
 	return r.id
 }
 
-func (r *IssueRepository) Path() string {
+func (r *issueRepository) Path() string {
 	return r.path
 }
-
-func CreateRepo (repoRoot string, id int) IssueRepositoryInterface {
-  repo := IssueRepository{}
-  repo.initialize(repoRoot, id)
-  return &repo
-}
-
-var pushevent chan int
-
-func GetPushListener() <-chan int {
-	if pushevent == nil {
-	  	pushevent = make(chan int, 16) // TODO buffer size
-      	pipeName := os.Getenv("HOME") + "/pushntfifo" // TODO hardcoded, TODO cleanup
-	  	syscall.Mkfifo(pipeName, 0666)
-      	SubscribeToPushEvent(pipeName, pushevent)
-    }
-    fmt.Println("FU GO")
-    return pushevent
-
-}
-
