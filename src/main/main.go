@@ -4,15 +4,6 @@ import "gorlim"
 import "fmt"
 import "strconv"
 
-func testPushSubscription() {
-  pushevent := gorlim.GetPushListener()  
-  gorlim.CreateRepo("." , 0)
-
-  for push := range pushevent {
-  	fmt.Println("push to repo id ", push)
-  }
-}
-
 func testAddIssues() gorlim.IssueRepositoryInterface {
    repo := gorlim.CreateRepo("." , 0)
 
@@ -59,8 +50,15 @@ func testGetIssues(repo gorlim.IssueRepositoryInterface) {
    	}
 }
 
+func setupSyncManager() *gorlim.SyncManager {
+  scmgr := &gorlim.SyncManager{};
+  pushevent := gorlim.GetPushListener()  
+  scmgr.SubscribeToPushEvent(pushevent)
+  return scmgr;
+}
+
 func main() {
   //testGetIssues(testAddIssues())
-//testPushSubscription()
+
 
 }
