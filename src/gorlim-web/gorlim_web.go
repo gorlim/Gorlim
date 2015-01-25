@@ -21,15 +21,24 @@ const GH_SUFFIX = "/auth/github"
 const PROJECTS_SUFFIX = "/projects"
 const ADD_SUFFIX = "/add_project"
 
-const DB_FILE = "./test.db"
-const CLIENT_ID = "a726527a9c585dfe4550"
-const SECRET_ID = "a2c0edff50fcda34cf214684f3bf70d6ff1cb05f"
-
 var db *storage.Storage
 
 var syncManager gorlim.SyncManager = *gorlim.Create()
 
+type configuration struct {
+	dbFile   string
+	clientId string
+	secretId string
+}
+
 func main() {
+	file, _ := os.Open("conf.json")
+	decoder := json.NewDecoder(file)
+	configuration := configuration{}
+	err := decoder.Decode(&configuration)
+	if err != nil {
+		panic(err)
+	}
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
 	db, err := storage.Create(DB_FILE)
