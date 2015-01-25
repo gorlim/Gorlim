@@ -5,7 +5,7 @@ import "time"
 type Comment struct {
 	Author string
 	Text   string
-	At     time.Time
+	At     *time.Time
 }
 
 type Issue struct {
