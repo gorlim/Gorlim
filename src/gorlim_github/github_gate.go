@@ -50,13 +50,18 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 	issuesService := client.Issues
 	result := make([]github.Issue, 0, 100)
 	opts := make([]github.IssueListByRepoOptions, 0, 100)
-	opts = append(opts, github.IssueListByRepoOptions{Milestone: "none", Assignee: "none", State: "open"})
-	opts = append(opts, github.IssueListByRepoOptions{Milestone: "*", Assignee: "none", State: "open"})
+	none := github.IssueListByRepoOptions{Milestone: "none", Assignee: "none", State: "open"}
+	none.ListOptions = github.ListOptions{PerPage: 100}
+	opts = append(opts, none)
+	any := github.IssueListByRepoOptions{Milestone: "*", Assignee: "none", State: "open"}
+	any.ListOptions = github.ListOptions{PerPage: 100}
+	opts = append(opts, any)
 	tmp := make([]github.IssueListByRepoOptions, 0, len(opts))
 	for _, opt := range opts {
 		newOpt := opt
 		newOpt.State = "closed"
 		tmp = append(tmp, newOpt)
+
 	}
 	opts = append(opts, tmp...)
 	tmp = make([]github.IssueListByRepoOptions, 0, len(opts))
@@ -64,24 +69,24 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 		newOpt := opt
 		newOpt.Assignee = "*"
 		tmp = append(tmp, newOpt)
-		opt.ListOptions = github.ListOptions{
-			PerPage: 100,
-		}
-		newOpt.ListOptions = github.ListOptions{
-			PerPage: 100,
-		}
 	}
 	opts = append(opts, tmp...)
+
 	for _, opt := range opts {
 		page := 1
-		maxPage := 100
+		maxPage := 1000
 		for page <= maxPage {
 			opt.Page = page
 			issues, resp, err := issuesService.ListByRepo(owner, repo, &opt)
 			if err == nil {
 				maxPage = resp.LastPage
 				result = append(result, issues...)
+				resp.Body.Close()
+			} else {
+				fmt.Println(err)
+				break
 			}
+			page++
 		}
 	}
 	return result, nil
