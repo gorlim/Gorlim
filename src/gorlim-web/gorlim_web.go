@@ -85,7 +85,7 @@ func main() {
 	listener := gorlim.GetPushSocketListener()
 	defer listener.Free()
 	syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
-	if err := http.ListenAndServe(":80", nil); err != nil {
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
