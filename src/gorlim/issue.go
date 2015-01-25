@@ -12,8 +12,8 @@ type Issue struct {
 	Id          int
 	Opened      bool
 	Creator     string
-	At          time.Time
-	ClosedAt    time.Time
+	At          *time.Time
+	ClosedAt    *time.Time
 	Assignee    string
 	Milestone   string
 	Title       string

@@ -149,11 +149,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 			if user := gComment.User; user != nil {
 				author = *user.Login
 			}
-			at := time.Unix(0, 0)
-			if t := gComment.UpdatedAt; t != nil {
-				at = *at
-			}
-			comments = append(comments, gorlim.Comment{Text: *gComment.Body, Author: author, At: at})
+			comments = append(comments, gorlim.Comment{Text: *gComment.Body, Author: author, At: gComment.UpdatedAt})
 		}
 	}
 	id := *gIssue.Number
@@ -174,14 +170,6 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	if ref := gIssue.Title; ref != nil {
 		title = *ref
 	}
-	at := time.Unix(0, 0)
-	if t := gIssue.CreatedAt; t != nil {
-		at = *t
-	}
-	closedAt := time.Unix(0, 0)
-	if t := gIssue.ClosedAt; t != nil {
-		closedAt = *t
-	}
 	pullRequest := ""
 	if pr := gIssue.PullRequestLinks; pr != nil {
 		pullRequest = *pr.PatchURL
@@ -189,8 +177,8 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 
 	result := gorlim.Issue{
 		Id:          id,
-		At:          at,
-		ClosedAt:    closedAt,
+		At:          gIssue.CreatedAt,
+		ClosedAt:    gIssue.ClosedAt,
 		Opened:      opened,
 		Creator:     creator,
 		Assignee:    assignee,
