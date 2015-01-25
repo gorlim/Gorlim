@@ -137,14 +137,15 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		labels = append(labels, *gIssue.Labels[i].Name)
 	}
 	commentAmount := len(gComments)
-	comments := make([]string, 0, commentAmount)
+	comments := make([]gorlim.Comment, 0, commentAmount)
 	description := ""
 	if ref := gIssue.Body; ref != nil {
 		description = *ref
 	}
 	if commentAmount > 0 {
 		for i := 0; i < commentAmount; i++ {
-			comments = append(comments, *gComments[i].Body)
+			gComment := gComments[i]
+			comments = append(comments, gorlim.Comment{Text: *gComment.Body, Author: *gComment.User, At: *gComment.UpdatedAt})
 		}
 	}
 	id := *gIssue.Number
