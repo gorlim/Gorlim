@@ -35,7 +35,7 @@ func (r repoImpl) SaveGithubAuth(user, auth string) error {
 }
 
 func (r repoImpl) GetGithubAuth(user string) (string, error) {
-	stmt, err := r.connection.Prepare("select auth from github_auth where login equals ?")
+	stmt, err := r.connection.Prepare("select auth from github_auth where login = ?")
 	if err != nil {
 		return "", err
 	}

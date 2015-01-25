@@ -20,14 +20,14 @@ const ADD_SUFFIX = "/add_project"
 
 const DB_FILE = "./test.db"
 
-var db storage.Storage
+var db *storage.Storage
 
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
 	db, err := storage.Create(DB_FILE)
 	if err != nil {
-		log.Fatal("Create: ", err)
+		panic(err)
 	}
 	http.HandleFunc(ADD_SUFFIX, func(w http.ResponseWriter, r *http.Request) {
 		text, err := ioutil.ReadAll(r.Body)
@@ -82,38 +82,69 @@ func main() {
 func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if code := query.Get("code"); code != "" {
-		data := url.Values{}
-		data.Set("client_id", "a726527a9c585dfe4550")
-		data.Set("client_secret", "a2c0edff50fcda34cf214684f3bf70d6ff1cb05f")
-		data.Set("code", code)
-
-		r, _ := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBufferString(data.Encode()))
-		r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-
-		resp, _ := http.PostForm("https://github.com/login/oauth/access_token", data)
-		defer resp.Body.Close()
-		contents, _ := ioutil.ReadAll(resp.Body)
-
-		values, _ := url.ParseQuery(string(contents))
-		t := &oauth.Transport{
-			Token: &oauth.Token{AccessToken: values.Get("access_token")},
-		}
-		client := github.NewClient(t.Client())
-		user, _, _ := client.Users.Get("")
-		go initUser(*user.Login, code, client)
+	  ch := make (chan error)
+	  go initUser(code, ch)
+	  err := <- ch
+	  fmt.Printf("err: %#v\n" , err)
 	}
 	http.Redirect(w, r, "/repositories.html", http.StatusFound)
 }
 
-func initUser(login, code string, client *github.Client) error {
-	_, err := db.GetGithubAuth(login)
+func initUser(code string, ch chan error) {
+	defer close(ch)
+	data := url.Values{}
+	data.Set("client_id", "a726527a9c585dfe4550")
+	data.Set("client_secret", "a2c0edff50fcda34cf214684f3bf70d6ff1cb05f")
+	data.Set("code", code)
+
+	r, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBufferString(data.Encode()))
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+
+	resp, err := http.PostForm("https://github.com/login/oauth/access_token", data)
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+	defer resp.Body.Close()
+	contents, err := ioutil.ReadAll(resp.Body)
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+
+	values, err := url.ParseQuery(string(contents))
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: values.Get("access_token")},
+	}
+	client := github.NewClient(t.Client())
+	user, _, err := client.Users.Get("")
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+	login := *user.Login
+	st, err := storage.Create(DB_FILE)
+	if (err != nil) {
+	  ch <- err
+	  return 
+	}
+	_, err = (*st).GetGithubAuth(login)
 	if err != nil {
 		options := &github.ListOptions{Page: 1, PerPage: 100}
 		for {
 			keys, resp, err := client.Users.ListKeys("", options)
-			if err != nil {
-				return err
+			if (err != nil) {
+			  ch <- err
+			  return 
 			}
 			for _, key := range keys {
 				fmt.Printf("key!!! : %#v\n\n", *key.Key)
@@ -124,7 +155,7 @@ func initUser(login, code string, client *github.Client) error {
 			options.Page = resp.NextPage
 		}
 	}
-	return db.SaveGithubAuth(login, code)
+	(*st).SaveGithubAuth(login, code)
 }
 
 func prettyError(w http.ResponseWriter, text string) {
