@@ -28,10 +28,10 @@ var syncManager gorlim.SyncManager = *gorlim.Create()
 var conf configuration = configuration{}
 
 type configuration struct {
-	dbFile   string
-	gitRoot  string
-	clientId string
-	secretId string
+	DbFile   string
+	GitRoot  string
+	ClientId string
+	SecretId string
 }
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 	}
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
-	db, err := storage.Create(conf.dbFile)
+	db, err := storage.Create(conf.DbFile)
 	if err != nil {
 		panic(err)
 	}
@@ -115,8 +115,8 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 func initUser(code string, ch chan error) {
 	defer close(ch)
 	data := url.Values{}
-	data.Set("client_id", conf.clientId)
-	data.Set("client_secret", conf.secretId)
+	data.Set("client_id", conf.ClientId)
+	data.Set("client_secret", conf.SecretId)
 	data.Set("code", code)
 
 	r, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBufferString(data.Encode()))
@@ -154,7 +154,7 @@ func initUser(code string, ch chan error) {
 		return
 	}
 	login := *user.Login
-	st, err := storage.Create(conf.dbFile)
+	st, err := storage.Create(conf.DbFile)
 	if err != nil {
 		ch <- err
 		return
@@ -185,13 +185,13 @@ func createOurRepo(myType, path string) {
 	user := split[0]
 	repoName := split[1]
 	t := &github.UnauthenticatedRateLimitedTransport{
-		ClientID:     conf.clientId,
-		ClientSecret: conf.secretId,
+		ClientID:     conf.ClientId,
+		ClientSecret: conf.SecretId,
 	}
 	fmt.Println(user + " " + repoName)
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
 	fmt.Println(issues)
-	repo := gorlim.CreateRepo(conf.gitRoot)
+	repo := gorlim.CreateRepo(conf.GitRoot)
 	syncManager.AddRepository("???", repo)
 	initRepo(&repo, issues)
 }
