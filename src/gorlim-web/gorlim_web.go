@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/go-github/github"
 	"gorlim_github"
+	"gorlim"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -25,6 +26,8 @@ const CLIENT_ID = "a726527a9c585dfe4550"
 const SECRET_ID = "a2c0edff50fcda34cf214684f3bf70d6ff1cb05f"
 
 var db *storage.Storage
+
+var syncManager gorlim.SyncManager = gorlim.SyncManager{}
 
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
@@ -79,6 +82,9 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	})
+    listener := gorlim.GetPushSocketListener()  
+    defer listener.Free()
+    syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
 	if err := http.ListenAndServe(":80", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
@@ -172,7 +178,17 @@ func createOurRepo(myType, path string) {
 		ClientSecret: SECRET_ID,
 	}
 	fmt.Println(user + " " + repo)
-	fmt.Println(gorlim_github.GetIssues(user, repo, t.Client(), ""))
+	issues := gorlim_github.GetIssues(user, repo, t.Client(), "")
+	fmt.Println(issues)
+	repo := gorlim.CreateRepo(path)
+	syncManager.AddRepository("???", repo)
+	initRepo(repo, issues)
+}
+
+func initRepo(repo *gorlim.IssueRepositoryInterface, issues []gorlim.Issue) {
+	for _, issue := range issues {
+		repo.Update("import from web: " + issue.Title, issue)	
+	}
 }
 
 func prettyError(w http.ResponseWriter, text string) {
