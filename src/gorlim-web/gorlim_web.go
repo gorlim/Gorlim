@@ -95,17 +95,36 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 		defer resp.Body.Close()
 		contents, _ := ioutil.ReadAll(resp.Body)
 
-		values, err := url.ParseQuery(string(contents))
+		values, _ := url.ParseQuery(string(contents))
 		t := &oauth.Transport{
 			Token: &oauth.Token{AccessToken: values.Get("access_token")},
 		}
 		client := github.NewClient(t.Client())
-		user, _, err := client.Users.Get("")
-		fmt.Println(err)
-		fmt.Printf("%#v %#v\n", values.Get("access_token"), user)
-		db.SaveGithubAuth(*user.Login, code)
+		user, _, _ := client.Users.Get("")
+		go initUser(*user.Login, code, client)
 	}
 	http.Redirect(w, r, "/repositories.html", http.StatusFound)
+}
+
+func initUser(login, code string, client *github.Client) error {
+	_, err := db.GetGithubAuth(login)
+	if err != nil {
+		options := &github.ListOptions{Page: 1, PerPage: 100}
+		for {
+			keys, resp, err := client.Users.ListKeys("", options)
+			if err != nil {
+				return err
+			}
+			for _, key := range keys {
+				fmt.Printf("key!!! : %#v\n\n", *key.Key)
+			}
+			if resp.NextPage == 0 {
+				break
+			}
+			options.Page = resp.NextPage
+		}
+	}
+	return db.SaveGithubAuth(login, code)
 }
 
 func prettyError(w http.ResponseWriter, text string) {
