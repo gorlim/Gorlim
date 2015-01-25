@@ -34,18 +34,27 @@ func (r *issueRepository) initialize(repoPath string) {
 	r.id = getUniqueRepoId()
 	r.path = repoPath
 	// create physical repo
-	repo, _ := git.InitRepository(r.path, false)
+	repo, err := git.InitRepository(r.path, false)
+	if err != nil {
+		panic ("Failed to create repo with path " + repoPath)
+	}
 	repo.Free()
 	// configure
 	setIgnoreDenyCurrentBranch(r.path) // allow push to non-bare repo
 	// setup pre-receive hook
-	pre, _ := os.Create(r.path + ".git/hooks/pre-receive")
+	pre, err := os.Create(r.path + "/.git/hooks/pre-receive")
+	if err != nil {
+		panic (err)
+	}
 	defer pre.Close()
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("exit 0\n")
 	// setup post-receive hook
-	post, _ := os.Create(r.path + ".git/hooks/post-receive")
+	post, err := os.Create(r.path + "/.git/hooks/post-receive")
+	if err != nil {
+		panic (err)
+	}
 	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
@@ -101,9 +110,24 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
 		split := strings.Split(path, "/")
-		issue := Issue{Opened: split[0] == "open", Milestone: split[1], Assignee: split[2][1:]}
-		id := split[3]
-		issue.Id, _ = strconv.Atoi(id)
+		issue := Issue {Opened: split[0] == "open" }
+		splitIndex := 1
+		if split[splitIndex][0] != '@' && split[splitIndex][0] == '#' {
+			issue.Milestone = split[splitIndex]
+			splitIndex++
+		}
+		if split[splitIndex][0] == '@' {
+			issue.Assignee =  split[splitIndex]	
+			splitIndex++
+		}
+		if split[splitIndex][0] == '#' {
+			issue.Id, err = strconv.Atoi(split[splitIndex][1:])
+			if err != nil {
+				panic ("Invalid issue id "  + split[splitIndex][1:])
+			}
+		} else {
+			panic ("Wrong issue path" + path)
+		}
 		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
 			panic(err)
