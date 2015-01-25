@@ -1,6 +1,7 @@
 package gorlim_github
 
 import (
+	"fmt"
 	"github.com/google/go-github/github"
 	"gorlim"
 	"net/http"
