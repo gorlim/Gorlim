@@ -26,8 +26,8 @@ function getAll() {
 			if (el.Ready) {
   			text.onclick = (function(x) {
   			  return function() {
-  			    rw.innerHTML = "git@54.68.195.37:/opt/git/" + x
-  			    ro.innerHTML = " git://54.68.195.37/" + x
+  			    rw.innerHTML = "git@54.68.195.37:/opt/git/" + x + ".issues"
+  			    ro.innerHTML = " git://54.68.195.37/" + x + ".issues"
   		      $('#myModal2').modal('show')
   				}
   			})(el.Origin)

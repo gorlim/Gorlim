@@ -220,7 +220,7 @@ func createOurRepo(myType, user, repoName string) {
 	date := time.Now()
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), nil)
 	key := user + "/" + repoName
-	path := conf.GitRoot + "/" + key
+	path := conf.GitRoot + "/" + key + ".issues"
 	fmt.Println(path)
 	repo := gorlim.CreateRepo(path)
 	syncManager.AddRepository(key, repo)
