@@ -10,6 +10,7 @@ type Storage interface {
 	GetGithubAuth(user string) (string, error)
 	SaveGithubAuth(user, auth string) error
 	GetRepos(needle string) ([]*Repo, error)
+	HasRepo(needle string) bool
 	AddRepo(myType, origin, target string) error
 }
 
@@ -61,6 +62,27 @@ func (r repoImpl) AddRepo(myType, origin, target string) error {
 	defer stmt.Close()
 	_, err = stmt.Exec(myType, origin, target)
 	return err
+}
+
+func (r repoImpl) HasRepo(needle string) bool {
+	stmt, err := r.connection.Prepare("select id from repositories where origin = ? and type = 'github'")
+	if err != nil {
+		return false
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(needle)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		err = rows.Scan(&id)
+		if err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (r repoImpl) GetRepos(needle string) ([]*Repo, error) {

@@ -69,12 +69,33 @@ func main() {
 			prettyError(w, "There is no such "+myType+" repository")
 			return
 		}
-		err = (*db).AddRepo(myType, repo, "lalala")
+		split := strings.Split(repo, "/")
+		if len(split) != 2 {
+			prettyError(w, "Should be in user/repo format")
+			return
+		}
+		if (*db).HasRepo(repo) {
+			prettyError(w, fmt.Sprintf("This GitHub:Issues is already extracted: %#v", repo))
+			return
+		}
+		user := split[0]
+		repoName := split[1]
+		t := &github.UnauthenticatedRateLimitedTransport{
+			ClientID:     conf.ClientId,
+			ClientSecret: conf.SecretId,
+		}
+		gh := github.NewClient(t.Client())
+		resp, _, err := gh.Repositories.Get(user, repoName)
+		if err != nil || resp == nil {
+			prettyError(w, fmt.Sprintf("No GitHub repository: %#v", repo))
+			return
+		}
+		err = (*db).AddRepo(myType, repo, "git@54.68.195.37:/opt/git/"+repo)
 		if err != nil {
 			prettyError(w, err.Error())
 			return
 		}
-		go createOurRepo(myType, repo)
+		go createOurRepo(myType, user, repoName)
 	})
 	http.HandleFunc(PROJECTS_SUFFIX, func(w http.ResponseWriter, r *http.Request) {
 		needle := ""
@@ -190,18 +211,13 @@ func initUser(code string, ch chan error) {
 	(*st).SaveGithubAuth(login, code)
 }
 
-func createOurRepo(myType, path string) {
-	split := strings.Split(path, "/")
-	user := split[0]
-	repoName := split[1]
+func createOurRepo(myType, user, repoName string) {
 	t := &github.UnauthenticatedRateLimitedTransport{
 		ClientID:     conf.ClientId,
 		ClientSecret: conf.SecretId,
 	}
-	fmt.Println(user + " " + repoName)
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
-	fmt.Println(issues)
-	repo := gorlim.CreateRepo(conf.GitRoot + "/" + path)
+	repo := gorlim.CreateRepo(conf.GitRoot + "/" + user + "/" + repoName)
 	syncManager.AddRepository("???", repo)
 	initRepo(&repo, issues)
 }
