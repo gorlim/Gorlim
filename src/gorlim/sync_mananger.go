@@ -4,19 +4,24 @@ import "time"
 import "fmt"
 
 type GitWebPair struct {
-	repo IssueRepositoryInterface
-	uri  string // TBD corresponding object
+	repo               IssueRepositoryInterface
+	uri                string // TBD corresponding object
 	webUpdateTimestamp time.Time
 }
 
+type IssuesUpdate struct {
+	Uri    string
+	Issues []Issue
+}
+
 type SyncManager struct {
-	idToReposMap       map[int]GitWebPair
-	uriToReposMap      map[string]GitWebPair	
+	idToReposMap  map[int]GitWebPair
+	uriToReposMap map[string]GitWebPair
 }
 
 // TBD: first parameter should be web issues interface
 func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryInterface) {
-	gwp := GitWebPair{repo: repo, uri: webIssuesUri, webUpdateTimestamp:time.Now()}
+	gwp := GitWebPair{repo: repo, uri: webIssuesUri, webUpdateTimestamp: time.Now()}
 	sm.idToReposMap[repo.Id()] = gwp
 	sm.uriToReposMap[webIssuesUri] = gwp
 }
@@ -61,15 +66,13 @@ func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
 }
 
 // Simple implementation of web-to-git updater - do not care that commit may come from the user in the same time for starters
-func (sm *SyncManager) SubscribeToWebUpdateEvent(webupdate <-chan struct {
-	string
-	issues []Issue
-}) {
+func (sm *SyncManager) SubscribeToWebUpdateEvent(webupdate <-chan IssuesUpdate) {
 	go func() {
 		for wupd := range webupdate {
-			uri := wupd.string
-			issues := wupd.issues
+			uri := wupd.Uri
+			issues := wupd.Issues
 			repo := sm.uriToReposMap[uri].repo
+			fmt.Println(uri)
 			for _, issue := range issues {
 				singleIssueSlice := make([]Issue, 1)
 				singleIssueSlice[0] = issue

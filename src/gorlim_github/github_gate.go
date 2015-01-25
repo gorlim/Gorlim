@@ -5,9 +5,10 @@ import (
 	"github.com/google/go-github/github"
 	"gorlim"
 	"net/http"
+	"time"
 )
 
-const DEFAULT_DATE string = "Tue, 1 Jan 2008 00:00:00 GMT"
+var DEFAULT_DATE time.Time = time.Unix(0, 0)
 
 type AuthenticatedTransport struct {
 	AccessToken string
@@ -44,17 +45,17 @@ func (t *AuthenticatedTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func getGithubIssues(owner string, repo string, client *github.Client, date string) ([]github.Issue, error) {
-	if date == "" {
-		date = DEFAULT_DATE
+func getGithubIssues(owner string, repo string, client *github.Client, date *time.Time) ([]github.Issue, error) {
+	if date == nil {
+		date = &DEFAULT_DATE
 	}
 	issuesService := client.Issues
 	result := make([]github.Issue, 0, 100)
 	opts := make([]github.IssueListByRepoOptions, 0, 100)
-	none := github.IssueListByRepoOptions{Milestone: "none", Assignee: "none", State: "open"}
+	none := github.IssueListByRepoOptions{Milestone: "none", Assignee: "none", State: "open", Since: *date}
 	none.ListOptions = github.ListOptions{PerPage: 100}
 	opts = append(opts, none)
-	any := github.IssueListByRepoOptions{Milestone: "*", Assignee: "none", State: "open"}
+	any := github.IssueListByRepoOptions{Milestone: "*", Assignee: "none", State: "open", Since: *date}
 	any.ListOptions = github.ListOptions{PerPage: 100}
 	opts = append(opts, any)
 	tmp := make([]github.IssueListByRepoOptions, 0, len(opts))
@@ -84,7 +85,9 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 				break
 			}
 			opt.ListOptions.Page = resp.NextPage
-			fmt.Printf("issues(%#v) +%#v = %#v/%#v\n", repo, len(issues), resp.NextPage, resp.LastPage)
+			if l := len(issues); l > 0 {
+				fmt.Printf("issues(%#v) +%#v since %#v = %#v/%#v\n", repo, l, *date, resp.NextPage, resp.LastPage)
+			}
 			if resp.NextPage == 0 {
 				break
 			}
@@ -93,11 +96,11 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 	return result, nil
 }
 
-func getGithubIssueComments(owner string, repo string, client *github.Client, date string) map[string][]github.IssueComment {
-	if date == "" {
-		date = DEFAULT_DATE
+func getGithubIssueComments(owner string, repo string, client *github.Client, date *time.Time) map[string][]github.IssueComment {
+	if date == nil {
+		date = &DEFAULT_DATE
 	}
-	clo := &github.IssueListCommentsOptions{}
+	clo := &github.IssueListCommentsOptions{Since: *date}
 	clo.ListOptions = github.ListOptions{PerPage: 100}
 	issuesService := client.Issues
 	result := make(map[string][]github.IssueComment)
@@ -115,7 +118,9 @@ func getGithubIssueComments(owner string, repo string, client *github.Client, da
 			result[key] = append(list, comment)
 		}
 		clo.ListOptions.Page = resp.NextPage
-		fmt.Printf("comments(%#v) %#v/%#v\n", repo, clo.ListOptions.Page, resp.LastPage)
+		if l := len(comments); l > 0 {
+			fmt.Printf("comments(%#v) +%#v since %#v %#v/%#v\n", repo, l, *date, clo.ListOptions.Page, resp.LastPage)
+		}
 		if resp.NextPage == 0 {
 			break
 		}
@@ -172,7 +177,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	return result
 }
 
-func GetIssues(owner string, repo string, client *http.Client, date string) []gorlim.Issue {
+func GetIssues(owner string, repo string, client *http.Client, date *time.Time) []gorlim.Issue {
 	gh := github.NewClient(client)
 	gIssues, err := getGithubIssues(owner, repo, gh, date)
 	if err != nil {

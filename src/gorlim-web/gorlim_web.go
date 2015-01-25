@@ -217,14 +217,14 @@ func createOurRepo(myType, user, repoName string) {
 		ClientID:     conf.ClientId,
 		ClientSecret: conf.SecretId,
 	}
-	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
+	date := time.Now()
+	issues := gorlim_github.GetIssues(user, repoName, t.Client(), nil)
 	key := user + "/" + repoName
 	path := conf.GitRoot + "/" + key
 	fmt.Println(path)
 	repo := gorlim.CreateRepo(path)
-	syncManager.AddRepository("???", repo)
-	syncManager.InitGitRepoFromIssues("???", repo, issues)
-
+	syncManager.AddRepository(key, repo)
+	syncManager.InitGitRepoFromIssues(key, repo, issues)
 	st, err := storage.Create(conf.DbFile)
 	if err != nil {
 		return
@@ -233,8 +233,18 @@ func createOurRepo(myType, user, repoName string) {
 	if err != nil {
 		return
 	}
+	ch := make(chan gorlim.IssuesUpdate)
+	syncManager.SubscribeToWebUpdateEvent(ch)
 	prev := *r
 	(*st).AddRepo(*prev.Type, *prev.Origin, *prev.Last, true)
+	ticker := time.NewTicker(time.Second * 10)
+	go func() {
+		for now := range ticker.C {
+			issues := gorlim_github.GetIssues(user, repoName, t.Client(), &date)
+			date = now
+			ch <- gorlim.IssuesUpdate{Uri: key, Issues: issues}
+		}
+	}()
 }
 
 func prettyError(w http.ResponseWriter, text string) {
