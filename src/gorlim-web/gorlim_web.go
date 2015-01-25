@@ -237,7 +237,7 @@ func createOurRepo(myType, user, repoName string) {
 	syncManager.SubscribeToWebUpdateEvent(ch)
 	prev := *r
 	(*st).AddRepo(*prev.Type, *prev.Origin, *prev.Last, true)
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for now := range ticker.C {
 			issues := gorlim_github.GetIssues(user, repoName, t.Client(), &date)
