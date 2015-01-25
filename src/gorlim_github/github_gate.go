@@ -98,7 +98,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	id := *gIssue.Number
 	opened := (*gIssue.State) == "opened"
 	assignee := ""
-	if user := gIssue.User; user != nil {
+	if user := gIssue.Assignee; user != nil {
 		assignee = *user.Login
 	}
 	milestone := ""
