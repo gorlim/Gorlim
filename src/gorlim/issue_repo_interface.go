@@ -10,8 +10,8 @@ type IssueRepositoryInterface interface {
 	Path() string
 }
 
-func CreateRepo (repoRoot string, id int) IssueRepositoryInterface {
+func CreateRepo (repoPath string) IssueRepositoryInterface {
   repo := issueRepository{}
-  repo.initialize(repoRoot, id)
+  repo.initialize(repoPath)
   return &repo
 }

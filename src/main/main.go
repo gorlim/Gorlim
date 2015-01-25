@@ -6,7 +6,7 @@ import "strconv"
 import "time"
 
 func testAddIssues() gorlim.IssueRepositoryInterface {
-   repo := gorlim.CreateRepo("/home/leonid/Gala/Gorlim/src/main" , 0)
+   repo := gorlim.CreateRepo("/home/leonid/Gala/Gorlim/src/main/issues0")
 
    issue1 := gorlim.Issue{Id:1, Opened: true, Assignee:"gark", Milestone:"mile", Title:"mytitle", 
                           Description:"mydescription", Labels: []string{"l1", "l2"}, Comments: []string{"a", "b", "c"}}

@@ -9,15 +9,28 @@ import "strings"
 import "bufio"
 //import "os/exec"
 import "time"
+import "sync"
 
 type issueRepository struct {
    id int
    path string
 }
 
-func (r *issueRepository) initialize (repoRoot string, id int) {
-	r.id = id
-	r.path = repoRoot + "/" + "issues" + strconv.Itoa(id)
+var mutex = &sync.Mutex{}
+var id int = 0 
+
+func getUniqueRepoId() int {
+	var returnId int
+	mutex.Lock();
+	returnId = id
+	id = id + 1
+	mutex.Unlock();
+	return returnId
+}
+
+func (r *issueRepository) initialize (repoPath string) {
+	r.id = getUniqueRepoId()
+	r.path = repoPath
 	// create physical repo
 	repo, _ := git.InitRepository(r.path,  false)
 	repo.Free()
@@ -34,7 +47,7 @@ func (r *issueRepository) initialize (repoRoot string, id int) {
  	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
-	post.WriteString("echo " + strconv.Itoa(id) + " >" + getPushPipeName())
+	post.WriteString("echo " + strconv.Itoa(r.id) + " >" + getPushPipeName())
 	return 
 }
 
@@ -279,34 +292,40 @@ func (r *issueRepository) Update(message string, issues []Issue) {
    			}
    		}
    }   
-
-   treeId, err := idx.WriteTree()
+   treeId, err := idx.WriteTree();
    if err != nil {
   	 panic(err)
    }
-
-   err = idx.Write()
+   if err = idx.Write(); err != nil {
+	 panic(err)
+   }
+   tree, err := repo.LookupTree(treeId);
    if err != nil {
 	 panic(err)
    }
-
-   tree, err := repo.LookupTree(treeId)
-   if err != nil {
-	 panic(err)
-   }
-
    head, _ := repo.Head()
-
    var headCommit *git.Commit
-
    if head != nil {
    		headCommit, err = repo.LookupCommit(head.Target())
    		if err != nil {
      		panic(err)
    		}
 	}
-
-    signature := &git.Signature{Name:"web-interface", Email:"none", When: time.Now()}
+	// check if author is the same 
+	author := ""
+	singleAuthor := true
+	for _, issue := range issues {
+		if author == "" {
+			author = issue.Creator
+		} else if author != issue.Creator {
+			singleAuthor = false
+			break
+		}
+	}
+	if singleAuthor == false {
+		author = "multiple authors"
+	}
+    signature := &git.Signature{Name:"web-interface: " + author, Email:"none", When: time.Now()}
     if headCommit != nil {
    		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree, headCommit)
 	} else {
