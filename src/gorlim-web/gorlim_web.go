@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"storage"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ const ADD_SUFFIX = "/add_project"
 var db *storage.Storage
 
 var syncManager gorlim.SyncManager = *gorlim.Create()
+var conf configuration = configuration{}
 
 type configuration struct {
 	dbFile   string
@@ -34,14 +36,13 @@ type configuration struct {
 func main() {
 	file, _ := os.Open("conf.json")
 	decoder := json.NewDecoder(file)
-	configuration := configuration{}
-	err := decoder.Decode(&configuration)
+	err := decoder.Decode(&conf)
 	if err != nil {
 		panic(err)
 	}
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
-	db, err := storage.Create(DB_FILE)
+	db, err := storage.Create(conf.dbFile)
 	if err != nil {
 		panic(err)
 	}
@@ -113,8 +114,8 @@ func githubAuthHandler(w http.ResponseWriter, r *http.Request) {
 func initUser(code string, ch chan error) {
 	defer close(ch)
 	data := url.Values{}
-	data.Set("client_id", CLIENT_ID)
-	data.Set("client_secret", SECRET_ID)
+	data.Set("client_id", conf.clientId)
+	data.Set("client_secret", conf.secretId)
 	data.Set("code", code)
 
 	r, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBufferString(data.Encode()))
@@ -152,7 +153,7 @@ func initUser(code string, ch chan error) {
 		return
 	}
 	login := *user.Login
-	st, err := storage.Create(DB_FILE)
+	st, err := storage.Create(conf.dbFile)
 	if err != nil {
 		ch <- err
 		return
@@ -183,8 +184,8 @@ func createOurRepo(myType, path string) {
 	user := split[0]
 	repoName := split[1]
 	t := &github.UnauthenticatedRateLimitedTransport{
-		ClientID:     CLIENT_ID,
-		ClientSecret: SECRET_ID,
+		ClientID:     conf.clientId,
+		ClientSecret: conf.secretId,
 	}
 	fmt.Println(user + " " + repoName)
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
