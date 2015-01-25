@@ -3,75 +3,77 @@ package gorlim
 import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
+
 //import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
+
 //import "os/exec"
 import "time"
 import "sync"
 
 type issueRepository struct {
-   id int
-   path string
+	id   int
+	path string
 }
 
 var mutex = &sync.Mutex{}
-var id int = 0 
+var id int = 0
 
 func getUniqueRepoId() int {
 	var returnId int
-	mutex.Lock();
+	mutex.Lock()
 	returnId = id
 	id = id + 1
-	mutex.Unlock();
+	mutex.Unlock()
 	return returnId
 }
 
-func (r *issueRepository) initialize (repoPath string) {
+func (r *issueRepository) initialize(repoPath string) {
 	r.id = getUniqueRepoId()
 	r.path = repoPath
 	// create physical repo
-	repo, _ := git.InitRepository(r.path,  false)
+	repo, _ := git.InitRepository(r.path, false)
 	repo.Free()
 	// configure
 	setIgnoreDenyCurrentBranch(r.path) // allow push to non-bare repo
 	// setup pre-receive hook
 	pre, _ := os.Create(r.path + ".git/hooks/pre-receive")
- 	defer pre.Close()
+	defer pre.Close()
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("exit 0\n")
 	// setup post-receive hook
 	post, _ := os.Create(r.path + ".git/hooks/post-receive")
- 	defer post.Close()
+	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
 	post.WriteString("echo " + strconv.Itoa(r.id) + " >" + getPushPipeName())
-	return 
+	return
 }
 
 func setIgnoreDenyCurrentBranch(rpath string) {
 	// this is an ugly hack to add config record - git.Config interfaces didn't work for me... TBD...
 	cfgpath := rpath + "/.git/config"
- 	file, err := os.Open(cfgpath)
+	file, err := os.Open(cfgpath)
 	if err != nil {
-    	panic (err)
-	} 
+		panic(err)
+	}
 	content := readTextFile(file)
 	file.Close()
 	file, err = os.OpenFile(cfgpath, os.O_WRONLY, 0666)
 	defer file.Close()
 	if err != nil {
-		panic (err)
-	} 
+		panic(err)
+	}
 	content = append(content, "\n[receive]")
 	content = append(content, "        denyCurrentBranch = ignore\n")
 	for _, str := range content {
 		_, err := file.WriteString(str + "\n")
 		if err != nil {
-			panic (err)
-		} 
+			panic(err)
+		}
 	}
 }
 
@@ -79,12 +81,12 @@ func (r *issueRepository) GetIssue(id int) (Issue, bool) {
 	panic("Repository:GetIssue not implemented")
 }
 
-func (r *issueRepository) GetIssues() ([]Issue,[]time.Time) {
+func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 	repo, _ := git.OpenRepository(r.path)
 	defer repo.Free()
 
-	copts := &git.CheckoutOpts{ Strategy : git.CheckoutForce }
-	repo.CheckoutHead(copts) // sync local dir 
+	copts := &git.CheckoutOpts{Strategy: git.CheckoutForce}
+	repo.CheckoutHead(copts) // sync local dir
 
 	idx, err := repo.Index()
 	if err != nil {
@@ -99,17 +101,17 @@ func (r *issueRepository) GetIssues() ([]Issue,[]time.Time) {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
 		split := strings.Split(path, "/")
-		issue := Issue { Opened : split[0] == "open", Milestone : split[1], Assignee : split[2][1:] }
+		issue := Issue{Opened: split[0] == "open", Milestone: split[1], Assignee: split[2][1:]}
 		id := split[3]
 		issue.Id, _ = strconv.Atoi(id)
-		file, err := os.OpenFile(r.path + "/" + path, os.O_RDONLY, 0666)
+		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
-			panic (err)
-		}	
+			panic(err)
+		}
 		defer file.Close()
 		status := parseIssuePropertiesFromText(readTextFile(file), &issue)
 		if status == false {
-			panic ("Issue parse failed")
+			panic("Issue parse failed")
 		}
 		issues[i] = issue
 		timestamps[i] = ientry.Mtime
@@ -119,24 +121,24 @@ func (r *issueRepository) GetIssues() ([]Issue,[]time.Time) {
 
 func readTextFile(file *os.File) []string {
 	var lines []string
-  	scanner := bufio.NewScanner(file)
-  	for scanner.Scan() {
-    	lines = append(lines, scanner.Text())
-  	}
-  	return lines
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
-const delimiter string = "----------------------------------";
+const delimiter string = "----------------------------------"
 
 func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	i := 0
 	textLength := len(text)
 	// Parse Title
 	for ; i < textLength; i++ {
-		if (strings.Contains(text[i], "Title:")) {
+		if strings.Contains(text[i], "Title:") {
 			issue.Title = strings.TrimSpace(strings.Split(text[i], ":")[1])
 			i++
-			break;
+			break
 		}
 	}
 	if i == textLength {
@@ -145,15 +147,15 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	}
 	// Parse Labels
 	for ; i < textLength; i++ {
-		if (strings.Contains(text[i], "Labels:")) {
-			split  := strings.Split(text[i], ":")
+		if strings.Contains(text[i], "Labels:") {
+			split := strings.Split(text[i], ":")
 			labels := split[1]
-			split   = strings.Split(labels, ",")
+			split = strings.Split(labels, ",")
 			for _, label := range split {
 				issue.Labels = append(issue.Labels, strings.TrimSpace(label))
 			}
 			i++
-			break;
+			break
 		}
 	}
 	if i == textLength {
@@ -163,12 +165,12 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	// Parse description
 	if text[i] == delimiter {
 		i++
-	} else{
+	} else {
 		panic("panic")
 		return false
 	}
 	for ; i < textLength; i++ {
-		if (text[i] == delimiter) {
+		if text[i] == delimiter {
 			break
 		}
 		issue.Description = issue.Description + text[i]
@@ -179,7 +181,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	// Parse comments
 	if text[i] == delimiter {
 		i++
-	} else{
+	} else {
 		panic("panic")
 		return false
 	}
@@ -192,50 +194,54 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 		}
 		comment = comment + text[i]
 	}
-    return true
+	return true
 }
 
 func issueToText(issue Issue) string {
-   	var buffer bytes.Buffer
-    buffer.WriteString("Title: " + issue.Title + "\n\n");
-    buffer.WriteString("Labels: ")
-    for i, label := range issue.Labels {
-    	if i > 0 {
-    		buffer.WriteString(", ")
-    	}
-     	buffer.WriteString(label)
-    }
-    buffer.WriteString("\n" + delimiter + "\n")   
-    buffer.WriteString(issue.Description)
-    buffer.WriteString("\n" + delimiter + "\n")
-    for i, comment := range issue.Comments {
-    	if i > 0 {
-    		buffer.WriteString("\n" + delimiter + "\n")
-    	}
-    	buffer.WriteString(comment)
-    }
-    buffer.WriteString("\n")
-    return buffer.String()
+	var buffer bytes.Buffer
+	buffer.WriteString("Title: " + issue.Title + "\n\n")
+	buffer.WriteString("Labels: ")
+	for i, label := range issue.Labels {
+		if i > 0 {
+			buffer.WriteString(", ")
+		}
+		buffer.WriteString(label)
+	}
+	buffer.WriteString("\n" + delimiter + "\n")
+	buffer.WriteString(issue.Description)
+	buffer.WriteString("\n" + delimiter + "\n")
+	for i, comment := range issue.Comments {
+		if i > 0 {
+			buffer.WriteString("\n" + delimiter + "\n")
+		}
+		buffer.WriteString(comment)
+	}
+	buffer.WriteString("\n")
+	return buffer.String()
 }
 
 func getIssueDir(issue Issue) string {
 	var buffer bytes.Buffer
 
 	if issue.Opened {
-		buffer.WriteString("open/")	
+		buffer.WriteString("open/")
 	} else {
-		buffer.WriteString("close/")	
+		buffer.WriteString("close/")
 	}
 
-	buffer.WriteString(issue.Milestone + "/")
+	if issue.Milestone != "" {
+		buffer.WriteString(issue.Milestone + "/")
+	}
 
-	buffer.WriteString("@" + issue.Assignee)
+	if issue.Assignee != "" {
+		buffer.WriteString("@" + issue.Assignee + "/")
+	}
 
 	return buffer.String()
 }
 
 func getIssueFileName(issue Issue) string {
-	return strconv.Itoa(issue.Id)
+	return "#" + strconv.Itoa(issue.Id)
 }
 
 func mkIssueIdToPathMap(idx *git.Index) map[int]string {
@@ -244,74 +250,74 @@ func mkIssueIdToPathMap(idx *git.Index) map[int]string {
 	for i := 0; i < int(issuesCount); i++ {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		split := strings.Split(ientry.Path, "/")
-		id, _ := strconv.Atoi(split[len(split) - 1])
+		id, _ := strconv.Atoi(split[len(split)-1])
 		idToPathMap[id] = ientry.Path
 	}
 	return idToPathMap
 }
 
-func (r *issueRepository) Update(message string, issues []Issue) {  
-   repo, _ := git.OpenRepository(r.path)
-   defer repo.Free()
-   
-   repo.CheckoutHead(nil) // sync local dir 
+func (r *issueRepository) Update(message string, issues []Issue) {
+	repo, _ := git.OpenRepository(r.path)
+	defer repo.Free()
 
-   idx, err := repo.Index()
-   if err != nil {
+	repo.CheckoutHead(nil) // sync local dir
+
+	idx, err := repo.Index()
+	if err != nil {
 		panic(err)
-   }
-
-   idToPathMap := mkIssueIdToPathMap(idx)
-
-   for _, issue := range issues {
-      	dir := r.path + "/" + getIssueDir(issue)
-      	repopath := getIssueDir(issue) + "/" + getIssueFileName(issue)
-      	filepath := r.path + "/" + repopath
-      	err := os.MkdirAll(dir, 0777)
-      	if err != nil {
-      		panic(err)
-      	}
-      	file, err := os.Create(filepath);
-      	if err != nil {
-      		panic(err)
-      	}
-      	file.WriteString(issueToText(issue))
-      	file.Close();   
-        err = idx.AddByPath(repopath)
-   	    if err != nil {
-       		panic(err)
-   		}
-   		// if old path to issue was different, then we need to delete old version
-   		oldPath, ok := idToPathMap[issue.Id]
-   		if ok && (oldPath != repopath) {
-   			if err := os.Remove(r.path + "/" + oldPath); err != nil {
-   				panic (err)
-   			}
-   			if err := idx.RemoveByPath(oldPath); err != nil {
-   				panic (err)
-   			}
-   		}
-   }   
-   treeId, err := idx.WriteTree();
-   if err != nil {
-  	 panic(err)
-   }
-   if err = idx.Write(); err != nil {
-	 panic(err)
-   }
-   tree, err := repo.LookupTree(treeId);
-   if err != nil {
-	 panic(err)
-   }
-   head, _ := repo.Head()
-   var headCommit *git.Commit
-   if head != nil {
-   		headCommit, err = repo.LookupCommit(head.Target())
-   		if err != nil {
-     		panic(err)
-   		}
 	}
-	// check if author is the same 
+
+	idToPathMap := mkIssueIdToPathMap(idx)
+
+	for _, issue := range issues {
+		dir := r.path + "/" + getIssueDir(issue)
+		repopath := getIssueDir(issue) + getIssueFileName(issue)
+		filepath := r.path + "/" + repopath
+		err := os.MkdirAll(dir, 0777)
+		if err != nil {
+			panic(err)
+		}
+		file, err := os.Create(filepath)
+		if err != nil {
+			panic(err)
+		}
+		file.WriteString(issueToText(issue))
+		file.Close()
+		err = idx.AddByPath(repopath)
+		if err != nil {
+			panic(err)
+		}
+		// if old path to issue was different, then we need to delete old version
+		oldPath, ok := idToPathMap[issue.Id]
+		if ok && (oldPath != repopath) {
+			if err := os.Remove(r.path + "/" + oldPath); err != nil {
+				panic(err)
+			}
+			if err := idx.RemoveByPath(oldPath); err != nil {
+				panic(err)
+			}
+		}
+	}
+	treeId, err := idx.WriteTree()
+	if err != nil {
+		panic(err)
+	}
+	if err = idx.Write(); err != nil {
+		panic(err)
+	}
+	tree, err := repo.LookupTree(treeId)
+	if err != nil {
+		panic(err)
+	}
+	head, _ := repo.Head()
+	var headCommit *git.Commit
+	if head != nil {
+		headCommit, err = repo.LookupCommit(head.Target())
+		if err != nil {
+			panic(err)
+		}
+	}
+	// check if author is the same
 	author := ""
 	singleAuthor := true
 	for _, issue := range issues {
@@ -325,15 +331,15 @@ func (r *issueRepository) Update(message string, issues []Issue) {
 	if singleAuthor == false {
 		author = "multiple authors"
 	}
-    signature := &git.Signature{Name:"web-interface: " + author, Email:"none", When: time.Now()}
-    if headCommit != nil {
-   		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree, headCommit)
+	signature := &git.Signature{Name: "web-interface: " + author, Email: "none", When: time.Now()}
+	if headCommit != nil {
+		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree, headCommit)
 	} else {
-		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree)	
+		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree)
 	}
-    if err != nil {
-	    panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (r *issueRepository) Id() int {
