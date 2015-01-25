@@ -169,25 +169,23 @@ func initUser(code string, ch chan error) {
 
 	defer f.Close()
 
-	if err != nil {
-		options := &github.ListOptions{Page: 1, PerPage: 100}
-		for {
-			keys, resp, err := client.Users.ListKeys("", options)
-			if err != nil {
+	options := &github.ListOptions{Page: 1, PerPage: 100}
+	for {
+		keys, resp, err := client.Users.ListKeys("", options)
+		if err != nil {
+			ch <- err
+			return
+		}
+		for _, key := range keys {
+			if _, err = f.WriteString((*key.Key) + "\n"); err != nil {
 				ch <- err
 				return
 			}
-			for _, key := range keys {
-				if _, err = f.WriteString(*key.Key); err != nil {
-					ch <- err
-					return
-				}
-			}
-			if resp.NextPage == 0 {
-				break
-			}
-			options.Page = resp.NextPage
 		}
+		if resp.NextPage == 0 {
+			break
+		}
+		options.Page = resp.NextPage
 	}
 	(*st).SaveGithubAuth(login, code)
 }
