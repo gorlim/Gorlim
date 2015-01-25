@@ -93,33 +93,51 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 	return result, nil
 }
 
-func getGithubIssueComments(owner string, repo string, client *github.Client, date string, gIssue github.Issue) ([]github.IssueComment, int) {
+func getGithubIssueComments(owner string, repo string, client *github.Client, date string) map[string][]github.IssueComment {
 	if date == "" {
 		date = DEFAULT_DATE
 	}
 	clo := &github.IssueListCommentsOptions{}
+	clo.ListOptions = github.ListOptions{PerPage: 100}
 	issuesService := client.Issues
-	comments, resp, _ := issuesService.ListComments(owner, repo, *gIssue.Comments, clo)
+	result := make(map[string][]github.IssueComment)
+	for {
+		comments, resp, err := issuesService.ListComments(owner, repo, 0, clo)
+		if err != nil {
+			break
+		}
+		for _, comment := range comments {
+			key := *comment.IssueURL
+			fmt.Println(comment)
+			list := result[key]
+			if list == nil {
+				list = make([]github.IssueComment, 0, 5)
+			}
+			result[key] = append(list, comment)
+		}
+		clo.ListOptions.Page = resp.NextPage
+		if resp.NextPage == 0 {
+			break
+		}
+	}
 
-	return comments, resp.StatusCode
+	return result
 }
 
 func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) gorlim.Issue {
 	labelAmount := len(gIssue.Labels)
-	labels := make([]string, labelAmount)
+	labels := make([]string, 0, labelAmount)
 	for i := 0; i < labelAmount; i++ {
 		labels[i] = *gIssue.Labels[i].Name
 	}
 	commentAmount := len(gComments)
-	description := ""
-	comments := make([]string, commentAmount)
+	comments := make([]string, 0, commentAmount)
+	description := *gIssue.Body
 	if commentAmount > 0 {
-		description = *(gComments[0].Body)
-		for i := 1; i < commentAmount; i++ {
-			comments[i] = *gComments[i].Body
+		for i := 0; i < commentAmount; i++ {
+			comments = append(comments, *gComments[i].Body)
 		}
 	}
-	fmt.Println(*gIssue.State)
 	id := *gIssue.Number
 	opened := (*gIssue.State) == "open"
 	assignee := ""
@@ -156,10 +174,16 @@ func GetIssues(owner string, repo string, client *http.Client, date string) []go
 	if err != nil {
 		panic(err)
 	}
-	iss := make([]gorlim.Issue, len(gIssues))
-	for i, issue := range gIssues {
-		comments, _ := getGithubIssueComments(owner, repo, gh, date, issue)
-		iss[i] = convertGithubIssue(issue, comments)
+	iss := make([]gorlim.Issue, 0, len(gIssues))
+	comments := getGithubIssueComments(owner, repo, gh, date)
+	noComments := make([]github.IssueComment, 0)
+	for _, issue := range gIssues {
+		value := comments[*issue.URL]
+		if value == nil {
+			value = noComments
+		}
+
+		iss = append(iss, convertGithubIssue(issue, value))
 	}
 	return iss
 }
