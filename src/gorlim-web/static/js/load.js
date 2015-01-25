@@ -1,3 +1,5 @@
+f
+
 function getAll() {
 	var xhr = new XMLHttpRequest();
   var params = 'needle=' + encodeURIComponent("") 
@@ -13,12 +15,21 @@ function getAll() {
 		  list.removeChild(list.firstChild);
 		}
 		var length = array.length;
+		var ro = document.getElementById('ro');
+		var rw = document.getElementById('rw');
 		for (var i = 0 ; i < length; i++) {
 		  var li = document.createElement('li');
 			li.className = li.className + " list-group-item text-left";
-			var text = document.createElement('div');
+			var text = document.createElement('a');
 			var el = array[i];
-			text.innerHTML = el.Origin + " can be used via <b>" + el.Target + "</b>";
+			text.onclick = (function(x) {
+			  return function() {
+			    ro.innerHTML = "git@54.68.195.37:/opt/git/" + x
+			    rw.innerHTML = " git://54.68.195.37/" + x
+		      $('#myModal2').modal('show')
+				}
+			})(el.Origin)
+			text.innerHTML = el.Origin
 			li.appendChild(text);
 			list.appendChild(li);
 		}
