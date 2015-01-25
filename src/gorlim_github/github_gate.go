@@ -125,6 +125,7 @@ func getGithubIssueComments(owner string, repo string, client *github.Client, da
 }
 
 func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) gorlim.Issue {
+	fmt.Printf("convert %#v\n", *gIssue.Number)
 	labelAmount := len(gIssue.Labels)
 	labels := make([]string, 0, labelAmount)
 	for i := 0; i < labelAmount; i++ {
@@ -132,7 +133,10 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	}
 	commentAmount := len(gComments)
 	comments := make([]string, 0, commentAmount)
-	description := *gIssue.Body
+	description := ""
+	if ref := gIssue.Body; ref != nil {
+		description = *ref
+	}
 	if commentAmount > 0 {
 		for i := 0; i < commentAmount; i++ {
 			comments = append(comments, *gComments[i].Body)
