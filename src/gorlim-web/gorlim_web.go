@@ -28,10 +28,11 @@ var syncManager gorlim.SyncManager = *gorlim.Create()
 var conf configuration = configuration{}
 
 type configuration struct {
-	DbFile   string
-	GitRoot  string
-	ClientId string
-	SecretId string
+	DbFile     string
+	GitRoot    string
+	ClientId   string
+	SecretId   string
+	KeyStorage string
 }
 
 func main() {
@@ -160,7 +161,7 @@ func initUser(code string, ch chan error) {
 		return
 	}
 	_, err = (*st).GetGithubAuth(login)
-	f, err := os.OpenFile("~/.ssh/authorized_keys", os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(conf.KeyStorage, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		ch <- err
 		return
