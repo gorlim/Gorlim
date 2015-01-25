@@ -36,7 +36,7 @@ func (r *issueRepository) initialize(repoPath string) {
 	// create physical repo
 	repo, err := git.InitRepository(r.path, false)
 	if err != nil {
-		panic ("Failed to create repo with path " + repoPath)
+		panic("Failed to create repo with path " + repoPath)
 	}
 	repo.Free()
 	// configure
@@ -44,7 +44,7 @@ func (r *issueRepository) initialize(repoPath string) {
 	// setup pre-receive hook
 	pre, err := os.Create(r.path + "/.git/hooks/pre-receive")
 	if err != nil {
-		panic (err)
+		panic(err)
 	}
 	defer pre.Close()
 	pre.Chmod(0777)
@@ -53,7 +53,7 @@ func (r *issueRepository) initialize(repoPath string) {
 	// setup post-receive hook
 	post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
-		panic (err)
+		panic(err)
 	}
 	defer post.Close()
 	post.Chmod(0777)
@@ -110,23 +110,23 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
 		split := strings.Split(path, "/")
-		issue := Issue {Opened: split[0] == "open" }
+		issue := Issue{Opened: split[0] == "open"}
 		splitIndex := 1
 		if split[splitIndex][0] != '@' && split[splitIndex][0] != '#' {
 			issue.Milestone = split[splitIndex]
 			splitIndex++
 		}
 		if split[splitIndex][0] == '@' {
-			issue.Assignee =  split[splitIndex]	
+			issue.Assignee = split[splitIndex]
 			splitIndex++
 		}
 		if split[splitIndex][0] == '#' {
 			issue.Id, err = strconv.Atoi(split[splitIndex][1:])
 			if err != nil {
-				panic ("Invalid issue id "  + split[splitIndex][1:])
+				panic("Invalid issue id " + split[splitIndex][1:])
 			}
 		} else {
-			panic ("Wrong issue path" + path)
+			panic("Wrong issue path" + path)
 		}
 		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
@@ -273,7 +273,7 @@ func mkIssueIdToPathMap(idx *git.Index) map[int]string {
 	idToPathMap := make(map[int]string)
 	for i := 0; i < int(issuesCount); i++ {
 		ientry, _ := idx.EntryByIndex(uint(i))
-		split := strings.Split(ientry.Path, "/")
+		split := strings.Split(ientry.Path, "#")
 		id, _ := strconv.Atoi(split[len(split)-1])
 		idToPathMap[id] = ientry.Path
 	}
