@@ -14,6 +14,7 @@ type SyncManager struct {
 	uriToReposMap      map[string]GitWebPair	
 }
 
+// TBD: first parameter should be web issues interface
 func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryInterface) {
 	gwp := GitWebPair{repo: repo, uri: webIssuesUri, webUpdateTimestamp:time.Now()}
 	sm.idToReposMap[repo.Id()] = gwp
@@ -27,7 +28,8 @@ func Create() *SyncManager {
 	}
 }
 
-func (sm *SyncManager) InitGetRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface, issues []Issue) {
+// TBD: idea is that we don't nee third parameter is first paramter will be real WebIssue interface with getIssues method
+func (sm *SyncManager) InitGitRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface, issues []Issue) {
 	for _, issue := range issues {
 		repo.Update("import from web: "+issue.Title, []Issue{issue})
 	}

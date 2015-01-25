@@ -3,10 +3,10 @@ package main
 import "gorlim"
 import "fmt"
 import "strconv"
-import "time"
+import "os"
 
 func testAddIssues() gorlim.IssueRepositoryInterface {
-   repo := gorlim.CreateRepo("/home/leonid/Gala/Gorlim/src/main/issues0")
+   repo := gorlim.CreateRepo(os.Getenv("HOME") + "/issues0")
 
    issue1 := gorlim.Issue{Id:1, Opened: true, Assignee:"gark", Milestone:"mile", Title:"mytitle", 
                           Description:"mydescription", Labels: []string{"l1", "l2"}, Comments: []string{"a", "b", "c"}}
@@ -52,16 +52,5 @@ func testGetIssues(repo gorlim.IssueRepositoryInterface) {
 
 func main() {
   r := testAddIssues()
-
-  scmgr := &gorlim.SyncManager{}
-  listener := gorlim.GetPushSocketListener()  
-  defer listener.Free()
-  scmgr.SubscribeToPushEvent(listener.GetSocketWriteEvent())
-    
-  //time.Sleep(time.Second * 10)
-  //fmt.Println("half time passed")
-  //time.Sleep(time.Second * 10)
   testGetIssues(r)
-
-  time.Sleep(time.Second)
 }

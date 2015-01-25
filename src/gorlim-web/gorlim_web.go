@@ -219,7 +219,7 @@ func createOurRepo(myType, user, repoName string) {
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
 	repo := gorlim.CreateRepo(conf.GitRoot + "/" + user + "/" + repoName)
 	syncManager.AddRepository("???", repo)
-	syncManager.InitGetRepoFromIssues("???", repo, issues)
+	syncManager.InitGitRepoFromIssues("???", repo, issues)
 }
 
 
