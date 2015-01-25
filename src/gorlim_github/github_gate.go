@@ -163,9 +163,14 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		creator = *author.Login
 	}
 	title := *gIssue.Title
+	at := time.Unix(0, 0)
+	if t := gIssue.CreatedAt; t != nil {
+		at = *t
+	}
 
 	result := gorlim.Issue{
 		Id:          id,
+		At:          at,
 		Opened:      opened,
 		Creator:     creator,
 		Assignee:    assignee,

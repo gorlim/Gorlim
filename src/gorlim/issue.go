@@ -12,6 +12,7 @@ type Issue struct {
 	Id          int
 	Opened      bool
 	Creator     string
+	At          time.Time
 	Assignee    string
 	Milestone   string
 	Title       string
