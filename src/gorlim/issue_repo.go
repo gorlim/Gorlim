@@ -175,6 +175,18 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 		panic("panic")
 		return false
 	}
+	// Parse Pull Request
+	for ; i < textLength; i++ {
+		if strings.Contains(text[i], "Patch:") {
+			issue.Title = strings.TrimSpace(strings.Split(text[i], ":")[1])
+			i++
+			break
+		}
+	}
+	if i == textLength {
+		panic("panic")
+		return false
+	}
 	// Parse Labels
 	for ; i < textLength; i++ {
 		if strings.Contains(text[i], "Labels:") {
@@ -237,6 +249,7 @@ func issueToText(issue Issue) string {
 		}
 		buffer.WriteString(label)
 	}
+	buffer.WriteString("Patch: " + issue.PullRequest + "\n\n")
 	buffer.WriteString("\n" + delimiter + "\n")
 	buffer.WriteString(issue.Description)
 	buffer.WriteString("\n" + delimiter + "\n")

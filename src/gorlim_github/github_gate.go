@@ -167,6 +167,10 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	if t := gIssue.CreatedAt; t != nil {
 		at = *t
 	}
+	pullRequest := ""
+	if pr := gIssue.PullRequestLinks; pr != nil {
+		pullRequest = *pr.PatchURL
+	}
 
 	result := gorlim.Issue{
 		Id:          id,
@@ -177,6 +181,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		Milestone:   milestone,
 		Title:       title,
 		Description: description,
+		PullRequest: pullRequest,
 		Labels:      labels,
 		Comments:    comments,
 	}
