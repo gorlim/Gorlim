@@ -1,6 +1,7 @@
 package gorlim_github
 
 import (
+	"fmt"
 	"github.com/google/go-github/github"
 	"gorlim"
 	"net/http"
@@ -41,15 +42,37 @@ func (t *AuthenticatedTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func getGithubIssues(owner string, repo string, client *github.Client, date string) ([]github.Issue, int, error) {
+func getGithubIssues(owner string, repo string, client *github.Client, date string) ([]github.Issue, error) {
 	if date == "" {
 		date = "Sat, 24 Jan 2015 00:00:00 GMT"
 	}
-	ilo := &github.IssueListByRepoOptions{}
 	issuesService := client.Issues
-	issues, resp, err := issuesService.ListByRepo(owner, repo, ilo)
-
-	return issues, resp.StatusCode, err
+	result := make([]github.Issue, 0, 100)
+	opts := make([]github.IssueListByRepoOptions, 0, 100)
+	opts = append(opts, github.IssueListByRepoOptions{Milestone: "none", Assignee: "none", State: "open"})
+	opts = append(opts, github.IssueListByRepoOptions{Milestone: "*", Assignee: "none", State: "open"})
+	tmp := make([]github.IssueListByRepoOptions, 0, len(opts))
+	for _, opt := range opts {
+		newOpt := opt
+		newOpt.State = "closed"
+		tmp = append(tmp, newOpt)
+	}
+	opts = append(opts, tmp...)
+	tmp = make([]github.IssueListByRepoOptions, 0, len(opts))
+	for _, opt := range opts {
+		newOpt := opt
+		newOpt.Assignee = "*"
+		tmp = append(tmp, newOpt)
+	}
+	opts = append(opts, tmp...)
+	for _, opt := range opts {
+		issues, _, err := issuesService.ListByRepo(owner, repo, &opt)
+		if err == nil {
+			result = append(result, issues...)
+		}
+	}
+	fmt.Println(result)
+	return result, nil
 }
 
 func getGithubIssueComments(owner string, repo string, client *github.Client, date string, gIssue github.Issue) ([]github.IssueComment, int, error) {
@@ -74,13 +97,25 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	for i := 0; i < commentAmount; i++ {
 		comments[i] = *gComments[i].Body
 	}
+	id := *gIssue.Number
+	opened := (*gIssue.State) == "opened"
+	assignee := ""
+	if user := gIssue.User; user != nil {
+		assignee = *user.Login
+	}
+	milestone := ""
+	if mi := gIssue.Milestone; mi != nil {
+		milestone = *mi.Title
+	}
+	title := *gIssue.Title
+	description := *gComments[0].Body
 	result := gorlim.Issue{
-		Id:          *gIssue.Number,
-		Opened:      *gIssue.State == "opened",
-		Assignee:    *gIssue.Assignee.Login,
-		Milestone:   *gIssue.Milestone.Title,
-		Title:       *gIssue.Title,
-		Description: *gComments[0].Body,
+		Id:          id,
+		Opened:      opened,
+		Assignee:    assignee,
+		Milestone:   milestone,
+		Title:       title,
+		Description: description,
 		Labels:      labels,
 		Comments:    comments,
 	}
@@ -89,7 +124,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 
 func GetIssues(owner string, repo string, client *http.Client, date string) []gorlim.Issue {
 	gh := github.NewClient(client)
-	gIssues, _, err := getGithubIssues(owner, repo, gh, date)
+	gIssues, err := getGithubIssues(owner, repo, gh, date)
 	if err != nil {
 		panic(err)
 	}
