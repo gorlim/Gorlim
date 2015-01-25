@@ -16,6 +16,7 @@ import (
 	"storage"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const GH_SUFFIX = "/auth/github"
@@ -74,7 +75,7 @@ func main() {
 			prettyError(w, "Should be in user/repo format")
 			return
 		}
-		if (*db).HasRepo(repo) {
+		if v, err := (*db).GetRepo(repo); err == nil && v != nil {
 			prettyError(w, fmt.Sprintf("This GitHub:Issues is already extracted: %#v", repo))
 			return
 		}
@@ -90,7 +91,7 @@ func main() {
 			prettyError(w, fmt.Sprintf("No GitHub repository: %#v", repo))
 			return
 		}
-		err = (*db).AddRepo(myType, repo, "git@54.68.195.37:/opt/git/"+repo)
+		err = (*db).AddRepo(myType, repo, time.Now(), false)
 		if err != nil {
 			prettyError(w, err.Error())
 			return
@@ -217,11 +218,23 @@ func createOurRepo(myType, user, repoName string) {
 		ClientSecret: conf.SecretId,
 	}
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
-	path := conf.GitRoot + "/" + user + "/" + repoName
+	key := user + "/" + repoName
+	path := conf.GitRoot + "/" + key
 	fmt.Println(path)
 	repo := gorlim.CreateRepo(path)
 	syncManager.AddRepository("???", repo)
 	syncManager.InitGitRepoFromIssues("???", repo, issues)
+
+	st, err := storage.Create(conf.DbFile)
+	if err != nil {
+		return
+	}
+	r, err := (*st).GetRepo(key)
+	if err != nil {
+		return
+	}
+	prev := *r
+	(*st).AddRepo(*prev.Type, *prev.Origin, *prev.Last, true)
 }
 
 func prettyError(w http.ResponseWriter, text string) {

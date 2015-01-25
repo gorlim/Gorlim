@@ -22,18 +22,26 @@ function getAll() {
 			li.className = li.className + " list-group-item text-left";
 			var text = document.createElement('a');
 			var el = array[i];
-			text.onclick = (function(x) {
-			  return function() {
-			    rw.innerHTML = "git@54.68.195.37:/opt/git/" + x
-			    ro.innerHTML = " git://54.68.195.37/" + x
-		      $('#myModal2').modal('show')
-				}
-			})(el.Origin)
 			text.innerHTML = el.Origin
+			if (el.Ready) {
+  			text.onclick = (function(x) {
+  			  return function() {
+  			    rw.innerHTML = "git@54.68.195.37:/opt/git/" + x
+  			    ro.innerHTML = " git://54.68.195.37/" + x
+  		      $('#myModal2').modal('show')
+  				}
+  			})(el.Origin)
+			}
+			var icon = document.createElement('i');
+			icon.className = !el.Ready ? 'fa fa-cog fa-spin' : "fa fa-folder-open-o";
+		  li.appendChild(icon);
 			li.appendChild(text);
 			list.appendChild(li);
 		}
 		filter();
+		setTimeout(function() {
+			getAll()
+		}, 30000);
 	};
 	xhr.send(params)
 }
