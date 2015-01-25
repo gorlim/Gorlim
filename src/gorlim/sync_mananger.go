@@ -38,10 +38,18 @@ func (sm *SyncManager) InitGitRepoFromIssues(webIssuesUri string, repo IssueRepo
 	for _, issue := range issues {
 		issue1 := issue
 		issue1.Comments = []Comment{}
-		repo.Update(fmt.Sprintf("import from web: #%v", issue.Id), []Issue{issue1}, issue.At, &issue.Creator)
+		issue1.Opened = true
+		repo.Update("webimport Opened issue: " + issue.Title + " " + issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
 		for i := 0; i < len(issue.Comments); i++ {
 			issue1.Comments = issue.Comments[0:i] 
-			repo.Update(fmt.Sprintf("import from web: #%v", issue.Id), []Issue{issue1}, issue.Comments[i].At, &issue.Comments[i].Author)
+			repo.Update(fmt.Sprintf("webimport: #%v", issue.Comments[i].Text), []Issue{issue1}, *issue.Comments[i].At, &issue.Comments[i].Author)
+		}
+		if issue.Opened == false {
+			if issue.Assignee == "" {
+				repo.Update("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, nil)
+			} else {
+				repo.Update("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, &issue.Assignee)
+			}
 		}
 	}
 	gwp := sm.idToReposMap[repo.Id()]
@@ -80,7 +88,7 @@ func (sm *SyncManager) SubscribeToWebUpdateEvent(webupdate <-chan IssuesUpdate) 
 			repo := sm.uriToReposMap[uri].repo
 			fmt.Println(uri)
 			for _, issue := range issues {
-				repo.Update("import from web: "+issue.Title, []Issue{issue}, time.Now(), nil)
+				repo.Update("webimport: "+issue.Title, []Issue{issue}, time.Now(), nil)
 			}
 		}
 	}()
