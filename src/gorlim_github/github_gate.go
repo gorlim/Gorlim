@@ -74,20 +74,20 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 	opts = append(opts, tmp...)
 
 	for _, opt := range opts {
-		page := 1
-		maxPage := 1000
-		for page <= maxPage {
-			opt.Page = page
+		for {
 			issues, resp, err := issuesService.ListByRepo(owner, repo, &opt)
 			if err == nil {
-				maxPage = resp.LastPage
 				result = append(result, issues...)
 				resp.Body.Close()
 			} else {
 				fmt.Println(err)
 				break
 			}
-			page++
+			opt.ListOptions.Page = resp.NextPage
+			fmt.Printf("issues(%#v) +%#v = %#v/%#v\n", repo, len(issues), resp.NextPage, resp.LastPage)
+			if resp.NextPage == 0 {
+				break
+			}
 		}
 	}
 	return result, nil
@@ -108,7 +108,6 @@ func getGithubIssueComments(owner string, repo string, client *github.Client, da
 		}
 		for _, comment := range comments {
 			key := *comment.IssueURL
-			fmt.Println(comment)
 			list := result[key]
 			if list == nil {
 				list = make([]github.IssueComment, 0, 5)
@@ -116,6 +115,7 @@ func getGithubIssueComments(owner string, repo string, client *github.Client, da
 			result[key] = append(list, comment)
 		}
 		clo.ListOptions.Page = resp.NextPage
+		fmt.Printf("comments(%#v) %#v/%#v\n", repo, clo.ListOptions.Page, resp.LastPage)
 		if resp.NextPage == 0 {
 			break
 		}
@@ -128,7 +128,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	labelAmount := len(gIssue.Labels)
 	labels := make([]string, 0, labelAmount)
 	for i := 0; i < labelAmount; i++ {
-		labels[i] = *gIssue.Labels[i].Name
+		labels = append(labels, *gIssue.Labels[i].Name)
 	}
 	commentAmount := len(gComments)
 	comments := make([]string, 0, commentAmount)
