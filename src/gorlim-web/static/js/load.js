@@ -17,7 +17,8 @@ function getAll() {
 		  var li = document.createElement('li');
 			li.className = li.className + " list-group-item text-left";
 			var text = document.createElement('div');
-			text.innerHTML = array[i].Origin;
+			var el = array[i];
+			text.innerHTML = el.Origin + " can be used via <b>" + el.Target + "</b>";
 			li.appendChild(text);
 			list.appendChild(li);
 		}
