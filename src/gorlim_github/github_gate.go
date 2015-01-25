@@ -64,12 +64,24 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 		newOpt := opt
 		newOpt.Assignee = "*"
 		tmp = append(tmp, newOpt)
+		opt.ListOptions = github.ListOptions{
+			PerPage: 100,
+		}
+		newOpt.ListOptions = github.ListOptions{
+			PerPage: 100,
+		}
 	}
 	opts = append(opts, tmp...)
 	for _, opt := range opts {
-		issues, _, err := issuesService.ListByRepo(owner, repo, &opt)
-		if err == nil {
-			result = append(result, issues...)
+		page := 1
+		maxPage := 100
+		for page <= maxPage {
+			opt.Page = page
+			issues, resp, err := issuesService.ListByRepo(owner, repo, &opt)
+			if err == nil {
+				maxPage = resp.LastPage
+				result = append(result, issues...)
+			}
 		}
 	}
 	return result, nil
