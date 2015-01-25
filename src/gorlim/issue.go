@@ -13,6 +13,7 @@ type Issue struct {
 	Opened      bool
 	Creator     string
 	At          time.Time
+	ClosedAt    time.Time
 	Assignee    string
 	Milestone   string
 	Title       string
