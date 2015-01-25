@@ -91,10 +91,15 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		labels[i] = *gIssue.Labels[i].Name
 	}
 	commentAmount := len(gComments)
+	description := ""
 	comments := make([]string, commentAmount)
-	for i := 0; i < commentAmount; i++ {
-		comments[i] = *gComments[i].Body
+	if commentAmount > 0 {
+		description = *(gComments[0].Body)
+		for i := 1; i < commentAmount; i++ {
+			comments[i] = *gComments[i].Body
+		}
 	}
+
 	id := *gIssue.Number
 	opened := (*gIssue.State) == "opened"
 	assignee := ""
@@ -106,10 +111,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		milestone = *mi.Title
 	}
 	title := *gIssue.Title
-	description := ""
-	if len(gComments) > 0 {
-		description = *(gComments[0].Body)
-	}
+
 	result := gorlim.Issue{
 		Id:          id,
 		Opened:      opened,
@@ -135,4 +137,8 @@ func GetIssues(owner string, repo string, client *http.Client, date string) []go
 		iss[i] = convertGithubIssue(issue, comments)
 	}
 	return iss
+}
+
+func SetIssues (owner string, repo string, client *http.Client, date string, []gorlim.Issue) {
+
 }
