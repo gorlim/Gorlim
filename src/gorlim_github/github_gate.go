@@ -1,7 +1,6 @@
 package gorlim_github
 
 import (
-	"fmt"
 	"github.com/google/go-github/github"
 	"gorlim"
 	"net/http"
@@ -71,19 +70,18 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 			result = append(result, issues...)
 		}
 	}
-	fmt.Println(result)
 	return result, nil
 }
 
-func getGithubIssueComments(owner string, repo string, client *github.Client, date string, gIssue github.Issue) ([]github.IssueComment, int, error) {
+func getGithubIssueComments(owner string, repo string, client *github.Client, date string, gIssue github.Issue) ([]github.IssueComment, int) {
 	if date == "" {
 		date = "Sat, 24 Jan 2015 00:00:00 GMT"
 	}
 	clo := &github.IssueListCommentsOptions{}
 	issuesService := client.Issues
-	comments, resp, err := issuesService.ListComments(owner, repo, *gIssue.Comments, clo)
+	comments, resp, _ := issuesService.ListComments(owner, repo, *gIssue.Comments, clo)
 
-	return comments, resp.StatusCode, err
+	return comments, resp.StatusCode
 }
 
 func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) gorlim.Issue {
@@ -108,7 +106,10 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 		milestone = *mi.Title
 	}
 	title := *gIssue.Title
-	description := *gComments[0].Body
+	description := ""
+	if len(gComments) > 0 {
+		description = *(gComments[0].Body)
+	}
 	result := gorlim.Issue{
 		Id:          id,
 		Opened:      opened,
@@ -129,12 +130,9 @@ func GetIssues(owner string, repo string, client *http.Client, date string) []go
 		panic(err)
 	}
 	iss := make([]gorlim.Issue, len(gIssues))
-	for i := 0; i < len(gIssues); i++ {
-		comments, _, err := getGithubIssueComments(owner, repo, gh, date, gIssues[i])
-		if err != nil {
-			break
-		}
-		iss[i] = convertGithubIssue(gIssues[i], comments)
+	for i, issue := range gIssues {
+		comments, _ := getGithubIssueComments(owner, repo, gh, date, issue)
+		iss[i] = convertGithubIssue(issue, comments)
 	}
 	return iss
 }
