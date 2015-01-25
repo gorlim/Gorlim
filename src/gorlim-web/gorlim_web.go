@@ -219,14 +219,9 @@ func createOurRepo(myType, user, repoName string) {
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
 	repo := gorlim.CreateRepo(conf.GitRoot + "/" + user + "/" + repoName)
 	syncManager.AddRepository("???", repo)
-	initRepo(&repo, issues)
+	syncManager.InitGetRepoFromIssues("???", repo, issues)
 }
 
-func initRepo(repo *gorlim.IssueRepositoryInterface, issues []gorlim.Issue) {
-	for _, issue := range issues {
-		(*repo).Update("import from web: "+issue.Title, []gorlim.Issue{issue})
-	}
-}
 
 func prettyError(w http.ResponseWriter, text string) {
 	http.Error(w, "<b>Ooops.</b> "+text, http.StatusInternalServerError)

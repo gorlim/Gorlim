@@ -1,20 +1,21 @@
 package gorlim
 
 import "time"
+import "fmt"
 
 type GitWebPair struct {
 	repo IssueRepositoryInterface
 	uri  string // TBD corresponding object
+	webUpdateTimestamp time.Time
 }
 
 type SyncManager struct {
 	idToReposMap       map[int]GitWebPair
-	uriToReposMap      map[string]GitWebPair
-	webUpdateTimestamp time.Time
+	uriToReposMap      map[string]GitWebPair	
 }
 
 func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryInterface) {
-	gwp := GitWebPair{repo: repo, uri: webIssuesUri}
+	gwp := GitWebPair{repo: repo, uri: webIssuesUri, webUpdateTimestamp:time.Now()}
 	sm.idToReposMap[repo.Id()] = gwp
 	sm.uriToReposMap[webIssuesUri] = gwp
 }
@@ -26,26 +27,33 @@ func Create() *SyncManager {
 	}
 }
 
-func (sm *SyncManager) InitGetRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface) {
-	repo.Update("initial commit", make([]Issue, 0)) // TBD - place to fetch Issues from web
+func (sm *SyncManager) InitGetRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface, issues []Issue) {
+	for _, issue := range issues {
+		repo.Update("import from web: "+issue.Title, []Issue{issue})
+	}
+	gwp := sm.idToReposMap[repo.Id()]
+	gwp.webUpdateTimestamp = time.Now()
+	sm.idToReposMap[repo.Id()] = gwp
 }
 
 func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
-	sm.webUpdateTimestamp = time.Unix(0, 0)
 	go func() {
 		for push := range pushevent {
 			// TBD here we can simply send current repo state to web interface
-			repo := sm.idToReposMap[push].repo
+			gwp := sm.idToReposMap[push]
+			repo := gwp.repo
 			issues, timestamps := repo.GetIssues()
 			currentTime := time.Now()
 			for index, tm := range timestamps {
 				// if modified later than last sync
-				if time.Since(tm) < time.Since(sm.webUpdateTimestamp) {
-					_ = issues[index]
+				if time.Since(tm) < time.Since(gwp.webUpdateTimestamp) {
+					issue := issues[index]
+					fmt.Println("Pushed issue", issue)
 					// TODO : send issue to web
 				}
 			}
-			sm.webUpdateTimestamp = currentTime
+			gwp.webUpdateTimestamp = currentTime
+			sm.idToReposMap[push] = gwp
 		}
 	}()
 }

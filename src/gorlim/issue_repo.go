@@ -4,7 +4,7 @@ import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
 
-//import "fmt"
+import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
@@ -112,7 +112,7 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 		split := strings.Split(path, "/")
 		issue := Issue {Opened: split[0] == "open" }
 		splitIndex := 1
-		if split[splitIndex][0] != '@' && split[splitIndex][0] == '#' {
+		if split[splitIndex][0] != '@' && split[splitIndex][0] != '#' {
 			issue.Milestone = split[splitIndex]
 			splitIndex++
 		}
