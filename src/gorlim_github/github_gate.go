@@ -77,6 +77,7 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	result := gorlim.Issue{
 		Id:          *gIssue.Number,
 		Opened:      *gIssue.State == "opened",
+		Creator:     *gIssue.User.Login,
 		Assignee:    *gIssue.Assignee.Login,
 		Milestone:   *gIssue.Milestone.Title,
 		Title:       *gIssue.Title,

@@ -3,6 +3,7 @@ package gorlim
 type Issue struct {
   Id int
   Opened bool
+  Creator string
   Assignee string
   Milestone string
   Title string
