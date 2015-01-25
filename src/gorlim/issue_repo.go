@@ -4,7 +4,7 @@ import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
 
-import "fmt"
+//import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
