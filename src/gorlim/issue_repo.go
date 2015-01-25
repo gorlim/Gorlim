@@ -8,6 +8,7 @@ import "bytes"
 import "strings"
 import "bufio"
 //import "os/exec"
+import "time"
 
 type issueRepository struct {
    id int
@@ -65,22 +66,22 @@ func (r *issueRepository) GetIssue(id int) (Issue, bool) {
 	panic("Repository:GetIssue not implemented")
 }
 
-func (r *issueRepository) GetIssues() []Issue {
-   repo, _ := git.OpenRepository(r.path)
-   defer repo.Free()
+func (r *issueRepository) GetIssues() ([]Issue,[]time.Time) {
+	repo, _ := git.OpenRepository(r.path)
+	defer repo.Free()
 
-    copts := &git.CheckoutOpts{ Strategy : git.CheckoutForce }
-    repo.CheckoutHead(copts) // sync local dir 
+	copts := &git.CheckoutOpts{ Strategy : git.CheckoutForce }
+	repo.CheckoutHead(copts) // sync local dir 
 
-    idx, err := repo.Index()
-    if err != nil {
+	idx, err := repo.Index()
+	if err != nil {
 		panic(err)
-    }
+	}
 
-    issuesCount := idx.EntryCount()
+	issuesCount := idx.EntryCount()
+	issues := make([]Issue, issuesCount)
+	timestamps := make([]time.Time, issuesCount)
 
-    issues := make([]Issue, issuesCount)
-	
 	for i := 0; i < int(issuesCount); i++ {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
@@ -98,9 +99,9 @@ func (r *issueRepository) GetIssues() []Issue {
 			panic ("Issue parse failed")
 		}
 		issues[i] = issue
+		timestamps[i] = ientry.Mtime
 	}
-
-	return issues
+	return issues, timestamps
 }
 
 func readTextFile(file *os.File) []string {
@@ -183,9 +184,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 
 func issueToText(issue Issue) string {
    	var buffer bytes.Buffer
-
     buffer.WriteString("Title: " + issue.Title + "\n\n");
-
     buffer.WriteString("Labels: ")
     for i, label := range issue.Labels {
     	if i > 0 {
@@ -193,20 +192,16 @@ func issueToText(issue Issue) string {
     	}
      	buffer.WriteString(label)
     }
-    buffer.WriteString("\n" + delimiter + "\n")
-    
+    buffer.WriteString("\n" + delimiter + "\n")   
     buffer.WriteString(issue.Description)
     buffer.WriteString("\n" + delimiter + "\n")
-
     for i, comment := range issue.Comments {
     	if i > 0 {
     		buffer.WriteString("\n" + delimiter + "\n")
     	}
     	buffer.WriteString(comment)
     }
-
     buffer.WriteString("\n")
-
     return buffer.String()
 }
 
@@ -230,6 +225,18 @@ func getIssueFileName(issue Issue) string {
 	return strconv.Itoa(issue.Id)
 }
 
+func mkIssueIdToPathMap(idx *git.Index) map[int]string {
+	issuesCount := idx.EntryCount()
+	idToPathMap := make(map[int]string)
+	for i := 0; i < int(issuesCount); i++ {
+		ientry, _ := idx.EntryByIndex(uint(i))
+		split := strings.Split(ientry.Path, "/")
+		id, _ := strconv.Atoi(split[len(split) - 1])
+		idToPathMap[id] = ientry.Path
+	}
+	return idToPathMap
+}
+
 func (r *issueRepository) Update(message string, issues []Issue) {  
    repo, _ := git.OpenRepository(r.path)
    defer repo.Free()
@@ -240,6 +247,8 @@ func (r *issueRepository) Update(message string, issues []Issue) {
    if err != nil {
 		panic(err)
    }
+
+   idToPathMap := mkIssueIdToPathMap(idx)
 
    for _, issue := range issues {
       	dir := r.path + "/" + getIssueDir(issue)
@@ -255,10 +264,19 @@ func (r *issueRepository) Update(message string, issues []Issue) {
       	}
       	file.WriteString(issueToText(issue))
       	file.Close();   
-
         err = idx.AddByPath(repopath)
    	    if err != nil {
        		panic(err)
+   		}
+   		// if old path to issue was different, then we need to delete old version
+   		oldPath, ok := idToPathMap[issue.Id]
+   		if ok && (oldPath != repopath) {
+   			if err := os.Remove(r.path + "/" + oldPath); err != nil {
+   				panic (err)
+   			}
+   			if err := idx.RemoveByPath(oldPath); err != nil {
+   				panic (err)
+   			}
    		}
    }   
 
@@ -288,7 +306,7 @@ func (r *issueRepository) Update(message string, issues []Issue) {
    		}
 	}
 
-    signature := &git.Signature{Name:"a", Email:"b"}
+    signature := &git.Signature{Name:"web-interface", Email:"none", When: time.Now()}
     if headCommit != nil {
    		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree, headCommit)
 	} else {

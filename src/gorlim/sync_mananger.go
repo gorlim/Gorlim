@@ -1,6 +1,6 @@
 package gorlim
 
-import "fmt"
+import "time"
 
 type GitWebPair struct {
   repo IssueRepositoryInterface
@@ -9,6 +9,7 @@ type GitWebPair struct {
 
 type SyncManager struct {    
 	idToReposMap map[int]GitWebPair
+	webUpdateTimestamp time.Time
 }
 
 func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryInterface) {
@@ -17,16 +18,24 @@ func (sm *SyncManager) AddRepository(webIssuesUri string, repo IssueRepositoryIn
 
 func (sm *SyncManager) InitGetRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface) {
 	repo.Update("initial commit", make([]Issue, 0)) // TBD - place to fetch Issues from web
-
-	// TBD: good optimization would be to ask repo for which issues were modified since the last known commit
 }
 
 func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
+	sm.webUpdateTimestamp = time.Unix(0, 0)
 	go func () {
 	  	for push := range pushevent {
-  			fmt.Println("push to repo id ", push)
   			// TBD here we can simply send current repo state to web interface
-			//sm.idToReposMap[push].repo.GetIssues() 
+  			repo := sm.idToReposMap[push].repo
+			issues, timestamps := repo.GetIssues() 
+			currentTime := time.Now()
+			for index, tm := range timestamps {
+				// if modified later than last sync
+				if time.Since(tm) < time.Since(sm.webUpdateTimestamp) {  
+					_ = issues[index]
+					// TODO : send issue to web 
+				}
+			}
+			sm.webUpdateTimestamp = currentTime
   		}
 	}()
 }

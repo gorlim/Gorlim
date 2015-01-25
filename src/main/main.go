@@ -24,7 +24,7 @@ func testAddIssues() gorlim.IssueRepositoryInterface {
 }
 
 func testGetIssues(repo gorlim.IssueRepositoryInterface) {
-   	issues := repo.GetIssues()
+    issues, _ := repo.GetIssues()
    	for _, issue := range issues {
    		fmt.Println("Issue")
    		fmt.Println("id: " + strconv.Itoa(issue.Id))

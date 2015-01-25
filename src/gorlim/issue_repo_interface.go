@@ -1,8 +1,10 @@
 package gorlim
 
+import "time"
+
 type IssueRepositoryInterface interface {
-	GetIssue(id int) (Issue, bool)
-	GetIssues() []Issue
+	GetIssue(id int) (Issue, bool) // not-implemented yet
+	GetIssues() ([]Issue, []time.Time)
 	Update(string, []Issue) 
 	Id() int
 	Path() string
