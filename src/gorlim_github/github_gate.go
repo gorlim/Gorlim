@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+const DEFAULT_DATE string = "Tue, 1 Jan 2008 00:00:00 GMT"
+
 type AuthenticatedTransport struct {
 	AccessToken string
 	Date        string
@@ -43,7 +45,7 @@ func (t *AuthenticatedTransport) transport() http.RoundTripper {
 
 func getGithubIssues(owner string, repo string, client *github.Client, date string) ([]github.Issue, error) {
 	if date == "" {
-		date = "Sat, 24 Jan 2015 00:00:00 GMT"
+		date = DEFAULT_DATE
 	}
 	issuesService := client.Issues
 	result := make([]github.Issue, 0, 100)
@@ -75,7 +77,7 @@ func getGithubIssues(owner string, repo string, client *github.Client, date stri
 
 func getGithubIssueComments(owner string, repo string, client *github.Client, date string, gIssue github.Issue) ([]github.IssueComment, int) {
 	if date == "" {
-		date = "Sat, 24 Jan 2015 00:00:00 GMT"
+		date = DEFAULT_DATE
 	}
 	clo := &github.IssueListCommentsOptions{}
 	issuesService := client.Issues
