@@ -217,11 +217,12 @@ func createOurRepo(myType, user, repoName string) {
 		ClientSecret: conf.SecretId,
 	}
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
-	repo := gorlim.CreateRepo(conf.GitRoot + "/" + user + "/" + repoName)
+	path := conf.GitRoot + "/" + user + "/" + repoName
+	fmt.Println(path)
+	repo := gorlim.CreateRepo(path)
 	syncManager.AddRepository("???", repo)
 	syncManager.InitGitRepoFromIssues("???", repo, issues)
 }
-
 
 func prettyError(w http.ResponseWriter, text string) {
 	http.Error(w, "<b>Ooops.</b> "+text, http.StatusInternalServerError)

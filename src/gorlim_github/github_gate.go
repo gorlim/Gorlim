@@ -119,8 +119,9 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 			comments[i] = *gComments[i].Body
 		}
 	}
+	fmt.Println(*gIssue.State)
 	id := *gIssue.Number
-	opened := (*gIssue.State) == "opened"
+	opened := (*gIssue.State) == "open"
 	assignee := ""
 	if user := gIssue.Assignee; user != nil {
 		assignee = *user.Login
