@@ -99,7 +99,6 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 			comments[i] = *gComments[i].Body
 		}
 	}
-
 	id := *gIssue.Number
 	opened := (*gIssue.State) == "opened"
 	assignee := ""
@@ -110,11 +109,16 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	if mi := gIssue.Milestone; mi != nil {
 		milestone = *mi.Title
 	}
+	creator := ""
+	if author := gIssue.User; author != nil {
+		creator = *author.Login
+	}
 	title := *gIssue.Title
 
 	result := gorlim.Issue{
 		Id:          id,
 		Opened:      opened,
+		Creator:     creator,
 		Assignee:    assignee,
 		Milestone:   milestone,
 		Title:       title,
