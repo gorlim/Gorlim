@@ -17,6 +17,7 @@ type Issue struct {
 	Milestone   string
 	Title       string
 	Description string
+	PullRequest string
 	Labels      []string
-	Comments    []*Comment
+	Comments    []Comment
 }
