@@ -230,7 +230,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	comment := ""
 	for ; i < textLength; i++ {
 		if text[i] == delimiter {
-			issue.Comments = append(issue.Comments, Comment{Text:comment})
+			issue.Comments = append(issue.Comments, Comment{Text: comment})
 			comment = ""
 			continue
 		}
@@ -242,6 +242,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 func issueToText(issue Issue) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("Title: " + issue.Title + "\n\n")
+	buffer.WriteString("Patch: " + issue.PullRequest + "\n\n")
 	buffer.WriteString("Labels: ")
 	for i, label := range issue.Labels {
 		if i > 0 {
@@ -249,7 +250,6 @@ func issueToText(issue Issue) string {
 		}
 		buffer.WriteString(label)
 	}
-	buffer.WriteString("Patch: " + issue.PullRequest + "\n\n")
 	buffer.WriteString("\n" + delimiter + "\n")
 	buffer.WriteString(issue.Description)
 	buffer.WriteString("\n" + delimiter + "\n")
@@ -362,7 +362,7 @@ func (r *issueRepository) Update(message string, issues []Issue, tm time.Time, u
 	}
 	// check if author is the same
 	author := ""
-	if (updateAuthor != nil) {
+	if updateAuthor != nil {
 		author = *updateAuthor
 	} else {
 		singleAuthor := true
