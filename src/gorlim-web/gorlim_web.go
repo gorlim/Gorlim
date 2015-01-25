@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
-	"gorlim_github"
 	"gorlim"
+	"gorlim_github"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,7 +27,7 @@ const SECRET_ID = "a2c0edff50fcda34cf214684f3bf70d6ff1cb05f"
 
 var db *storage.Storage
 
-var syncManager gorlim.SyncManager = gorlim.SyncManager{}
+var syncManager gorlim.SyncManager = *gorlim.Create()
 
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
@@ -82,9 +82,9 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	})
-    listener := gorlim.GetPushSocketListener()  
-    defer listener.Free()
-    syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
+	listener := gorlim.GetPushSocketListener()
+	defer listener.Free()
+	syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
 	if err := http.ListenAndServe(":80", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
@@ -172,22 +172,22 @@ func initUser(code string, ch chan error) {
 func createOurRepo(myType, path string) {
 	split := strings.Split(path, "/")
 	user := split[0]
-	repo := split[1]
+	repoName := split[1]
 	t := &github.UnauthenticatedRateLimitedTransport{
 		ClientID:     CLIENT_ID,
 		ClientSecret: SECRET_ID,
 	}
-	fmt.Println(user + " " + repo)
-	issues := gorlim_github.GetIssues(user, repo, t.Client(), "")
+	fmt.Println(user + " " + repoName)
+	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
 	fmt.Println(issues)
 	repo := gorlim.CreateRepo(path)
 	syncManager.AddRepository("???", repo)
-	initRepo(repo, issues)
+	initRepo(&repo, issues)
 }
 
 func initRepo(repo *gorlim.IssueRepositoryInterface, issues []gorlim.Issue) {
 	for _, issue := range issues {
-		repo.Update("import from web: " + issue.Title, issue)	
+		(*repo).Update("import from web: "+issue.Title, []gorlim.Issue{issue})
 	}
 }
 
