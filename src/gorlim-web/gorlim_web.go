@@ -29,6 +29,7 @@ var conf configuration = configuration{}
 
 type configuration struct {
 	dbFile   string
+	gitRoot  string
 	clientId string
 	secretId string
 }
@@ -190,7 +191,7 @@ func createOurRepo(myType, path string) {
 	fmt.Println(user + " " + repoName)
 	issues := gorlim_github.GetIssues(user, repoName, t.Client(), "")
 	fmt.Println(issues)
-	repo := gorlim.CreateRepo(path)
+	repo := gorlim.CreateRepo(conf.gitRoot)
 	syncManager.AddRepository("???", repo)
 	initRepo(&repo, issues)
 }
