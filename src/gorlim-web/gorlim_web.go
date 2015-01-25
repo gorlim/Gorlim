@@ -160,6 +160,14 @@ func initUser(code string, ch chan error) {
 		return
 	}
 	_, err = (*st).GetGithubAuth(login)
+	f, err := os.OpenFile("~/.ssh/authorized_keys", os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		ch <- err
+		return
+	}
+
+	defer f.Close()
+
 	if err != nil {
 		options := &github.ListOptions{Page: 1, PerPage: 100}
 		for {
@@ -169,7 +177,10 @@ func initUser(code string, ch chan error) {
 				return
 			}
 			for _, key := range keys {
-				fmt.Printf("key!!! : %#v\n\n", *key.Key)
+				if _, err = f.WriteString(*key.Key); err != nil {
+					ch <- err
+					return
+				}
 			}
 			if resp.NextPage == 0 {
 				break
