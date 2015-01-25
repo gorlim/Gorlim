@@ -24,8 +24,8 @@ function getAll() {
 			var el = array[i];
 			text.onclick = (function(x) {
 			  return function() {
-			    ro.innerHTML = "git@54.68.195.37:/opt/git/" + x
-			    rw.innerHTML = " git://54.68.195.37/" + x
+			    rw.innerHTML = "git@54.68.195.37:/opt/git/" + x
+			    ro.innerHTML = " git://54.68.195.37/" + x
 		      $('#myModal2').modal('show')
 				}
 			})(el.Origin)
