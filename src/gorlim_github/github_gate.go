@@ -143,6 +143,6 @@ func GetIssues(owner string, repo string, client *http.Client, date string) []go
 	return iss
 }
 
-func SetIssues (owner string, repo string, client *http.Client, date string, []gorlim.Issue) {
+func SetIssues(owner string, repo string, client *http.Client, date string, issues []gorlim.Issue) {
 
 }
