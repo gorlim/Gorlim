@@ -3,7 +3,7 @@ package gorlim
 import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
-import "fmt"
+//import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
@@ -24,13 +24,13 @@ func (r *issueRepository) initialize (repoRoot string, id int) {
 	setIgnoreDenyCurrentBranch(r.path) // allow push to non-bare repo
 	// setup pre-receive hook
 	pre, _ := os.Create(r.path + ".git/hooks/pre-receive")
-    defer pre.Close()
+ 	defer pre.Close()
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("exit 0\n")
 	// setup post-receive hook
 	post, _ := os.Create(r.path + ".git/hooks/post-receive")
-    defer post.Close()
+ 	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
 	post.WriteString("echo " + strconv.Itoa(id) + " >" + getPushPipeName())
@@ -40,26 +40,25 @@ func (r *issueRepository) initialize (repoRoot string, id int) {
 func setIgnoreDenyCurrentBranch(rpath string) {
 	// this is an ugly hack to add config record - git.Config interfaces didn't work for me... TBD...
 	cfgpath := rpath + "/.git/config"
-    file, err := os.Open(cfgpath)
-    if err != nil {
+ 	file, err := os.Open(cfgpath)
+	if err != nil {
     	panic (err)
-    } 
-    content := readTextFile(file)
-    file.Close()
-    file, err = os.OpenFile(cfgpath, os.O_WRONLY, 0666)
-    if err != nil {
-    	panic (err)
-    } 
-    content = append(content, "\n[receive]")
-    content = append(content, "        denyCurrentBranch = ignore\n")
-    for _, str := range content {
-       _, err := file.WriteString(str + "\n")
-           if err != nil {
-    	panic (err)
-    } 
-       fmt.Println(str)
-    }
-    file.Close()
+	} 
+	content := readTextFile(file)
+	file.Close()
+	file, err = os.OpenFile(cfgpath, os.O_WRONLY, 0666)
+	defer file.Close()
+	if err != nil {
+		panic (err)
+	} 
+	content = append(content, "\n[receive]")
+	content = append(content, "        denyCurrentBranch = ignore\n")
+	for _, str := range content {
+		_, err := file.WriteString(str + "\n")
+		if err != nil {
+			panic (err)
+		} 
+	}
 }
 
 func (r *issueRepository) GetIssue(id int) (Issue, bool) {

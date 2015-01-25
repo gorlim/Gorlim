@@ -3,7 +3,7 @@ package main
 import "gorlim"
 import "fmt"
 import "strconv"
-//import "time"
+import "time"
 
 func testAddIssues() gorlim.IssueRepositoryInterface {
    repo := gorlim.CreateRepo("/home/leonid/Gala/Gorlim/src/main" , 0)
@@ -22,7 +22,6 @@ func testAddIssues() gorlim.IssueRepositoryInterface {
    repo.Update("comment2", issues)	
    return repo
 }
-
 
 func testGetIssues(repo gorlim.IssueRepositoryInterface) {
    	issues := repo.GetIssues()
@@ -51,19 +50,18 @@ func testGetIssues(repo gorlim.IssueRepositoryInterface) {
    	}
 }
 
-func setupSyncManager() *gorlim.SyncManager {
-  scmgr := &gorlim.SyncManager{};
-  pushevent := gorlim.GetPushListener()  
-  scmgr.SubscribeToPushEvent(pushevent)
-  return scmgr;
-}
-
 func main() {
-  /*r := testAddIssues()
-  setupSyncManager()
+  r := testAddIssues()
 
+  scmgr := &gorlim.SyncManager{}
+  listener := gorlim.GetPushSocketListener()  
+  defer listener.Free()
+  scmgr.SubscribeToPushEvent(listener.GetSocketWriteEvent())
+    
   //time.Sleep(time.Second * 10)
-  fmt.Println("half time passed")
+  //fmt.Println("half time passed")
   //time.Sleep(time.Second * 10)
-  testGetIssues(r)*/
+  testGetIssues(r)
+
+  time.Sleep(time.Second)
 }

@@ -26,7 +26,7 @@ func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
 	  	for push := range pushevent {
   			fmt.Println("push to repo id ", push)
   			// TBD here we can simply send current repo state to web interface
-			sm.idToReposMap[push].repo.GetIssues() 
+			//sm.idToReposMap[push].repo.GetIssues() 
   		}
 	}()
 }
