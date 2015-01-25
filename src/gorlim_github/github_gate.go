@@ -166,7 +166,10 @@ func convertGithubIssue(gIssue github.Issue, gComments []github.IssueComment) go
 	if author := gIssue.User; author != nil {
 		creator = *author.Login
 	}
-	title := *gIssue.Title
+	title := ""
+	if ref := gIssue.Title; ref != nil {
+		title = *ref
+	}
 	at := time.Unix(0, 0)
 	if t := gIssue.CreatedAt; t != nil {
 		at = *t
