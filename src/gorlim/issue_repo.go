@@ -87,7 +87,13 @@ func setIgnoreDenyCurrentBranch(rpath string) {
 }
 
 func (r *issueRepository) GetIssue(id int) (Issue, bool) {
-	panic("Repository:GetIssue not implemented")
+	issues, _ := r.GetIssues()
+	for _, issue := range issues {
+		if issue.Id == id {
+			return issue, true
+		}
+	}
+	return Issue{}, false
 }
 
 func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
@@ -212,7 +218,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	comment := ""
 	for ; i < textLength; i++ {
 		if text[i] == delimiter {
-			issue.Comments = append(issue.Comments, comment)
+			issue.Comments = append(issue.Comments, Comment{Text:comment})
 			comment = ""
 			continue
 		}
@@ -238,7 +244,7 @@ func issueToText(issue Issue) string {
 		if i > 0 {
 			buffer.WriteString("\n" + delimiter + "\n")
 		}
-		buffer.WriteString(comment)
+		buffer.WriteString(comment.Text)
 	}
 	buffer.WriteString("\n")
 	return buffer.String()
@@ -280,7 +286,7 @@ func mkIssueIdToPathMap(idx *git.Index) map[int]string {
 	return idToPathMap
 }
 
-func (r *issueRepository) Update(message string, issues []Issue) {
+func (r *issueRepository) Update(message string, issues []Issue, tm time.Time, updateAuthor *string) {
 	repo, _ := git.OpenRepository(r.path)
 	defer repo.Free()
 
@@ -343,19 +349,23 @@ func (r *issueRepository) Update(message string, issues []Issue) {
 	}
 	// check if author is the same
 	author := ""
-	singleAuthor := true
-	for _, issue := range issues {
-		if author == "" {
-			author = issue.Creator
-		} else if author != issue.Creator {
-			singleAuthor = false
-			break
+	if (updateAuthor != nil) {
+		author = *updateAuthor
+	} else {
+		singleAuthor := true
+		for _, issue := range issues {
+			if author == "" {
+				author = issue.Creator
+			} else if author != issue.Creator {
+				singleAuthor = false
+				break
+			}
+		}
+		if singleAuthor == false {
+			author = "multiple authors"
 		}
 	}
-	if singleAuthor == false {
-		author = "multiple authors"
-	}
-	signature := &git.Signature{Name: "web-interface: " + author, Email: "none", When: time.Now()}
+	signature := &git.Signature{Name: author, Email: "none", When: tm}
 	if headCommit != nil {
 		_, err = repo.CreateCommit("refs/heads/master", signature, signature, message, tree, headCommit)
 	} else {

@@ -18,5 +18,5 @@ type Issue struct {
 	Title       string
 	Description string
 	Labels      []string
-	Comments    []*Comment
+	Comments    []Comment
 }

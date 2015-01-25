@@ -5,7 +5,7 @@ import "time"
 type IssueRepositoryInterface interface {
 	GetIssue(id int) (Issue, bool) // not-implemented yet
 	GetIssues() ([]Issue, []time.Time)
-	Update(string, []Issue) 
+	Update(string, []Issue, time.Time, *string) 
 	Id() int
 	Path() string
 }

@@ -36,7 +36,13 @@ func Create() *SyncManager {
 // TBD: idea is that we don't nee third parameter is first paramter will be real WebIssue interface with getIssues method
 func (sm *SyncManager) InitGitRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface, issues []Issue) {
 	for _, issue := range issues {
-		repo.Update(fmt.Sprintf("import from web: #%v", issue.Id), []Issue{issue})
+		issue1 := issue
+		issue1.Comments = []Comment{}
+		repo.Update(fmt.Sprintf("import from web: #%v", issue.Id), []Issue{issue1}, issue.At, &issue.Creator)
+		for i := 0; i < len(issue.Comments); i++ {
+			issue1.Comments = issue.Comments[0:i] 
+			repo.Update(fmt.Sprintf("import from web: #%v", issue.Id), []Issue{issue1}, issue.Comments[i].At, &issue.Comments[i].Author)
+		}
 	}
 	gwp := sm.idToReposMap[repo.Id()]
 	gwp.webUpdateTimestamp = time.Now()
@@ -74,9 +80,7 @@ func (sm *SyncManager) SubscribeToWebUpdateEvent(webupdate <-chan IssuesUpdate) 
 			repo := sm.uriToReposMap[uri].repo
 			fmt.Println(uri)
 			for _, issue := range issues {
-				singleIssueSlice := make([]Issue, 1)
-				singleIssueSlice[0] = issue
-				repo.Update("import from web: "+issue.Title, singleIssueSlice)
+				repo.Update("import from web: "+issue.Title, []Issue{issue}, time.Now(), nil)
 			}
 		}
 	}()
