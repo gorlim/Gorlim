@@ -74,7 +74,7 @@ function filter() {
 	var nodes = document.getElementById('search_list').childNodes
   var length = nodes.length
 	for(var i = 0; i < nodes.length; i++) {
-		var visible = nodes[i].childNodes[0].innerHTML.toLowerCase().indexOf(value) >= 0;
+		var visible = nodes[i].childNodes[1].innerHTML.toLowerCase().indexOf(value) >= 0;
 		nodes[i].style.display = visible ? "block" : "none";
 	}
 }
