@@ -4,18 +4,23 @@ import "github.com/libgit2/git2go"
 import "strconv"
 import "os"
 
-//import "fmt"
 import "bytes"
 import "strings"
 import "bufio"
 
-//import "os/exec"
+import "os/exec"
 import "time"
 import "sync"
+//import "path/filepath"
+
+// threshold for number of commits to repo
+// before issuing next "garbage collection"
+const gcThreshold = 200
 
 type issueRepository struct {
 	id   int
 	path string
+	gcCounter int
 }
 
 var mutex = &sync.Mutex{}
@@ -33,6 +38,7 @@ func getUniqueRepoId() int {
 func (r *issueRepository) initialize(repoPath string) {
 	r.id = getUniqueRepoId()
 	r.path = repoPath
+	r.gcCounter = 0
 	// create physical repo
 	repo, err := git.InitRepository(r.path, false)
 	if err != nil {
@@ -387,6 +393,12 @@ func (r *issueRepository) Update(message string, issues []Issue, tm time.Time, u
 	if err != nil {
 		panic(err)
 	}
+
+	r.gcCounter++
+	if r.gcCounter == gcThreshold {
+		r.doGarbageCollection()
+		r.gcCounter = 0
+	}
 }
 
 func (r *issueRepository) Id() int {
@@ -395,4 +407,14 @@ func (r *issueRepository) Id() int {
 
 func (r *issueRepository) Path() string {
 	return r.path
+}
+
+func (r *issueRepository) doGarbageCollection() {
+	// libgit2 API does not inlude explicit "gc" or "repack" command
+	// It (API) is too low-level, so we would need to implement our own repack algorithm
+	// Let's do this "hack" instead
+	_, err := exec.Command("git", "--git-dir=" + r.path + "/.git", "gc").CombinedOutput()
+	if err != nil {
+		panic(err)
+	}
 }
