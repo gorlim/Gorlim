@@ -3,9 +3,16 @@ package gorlim
 import "time"
 
 type IssueRepositoryInterface interface {
-	GetIssue(id int) (Issue, bool) // not-implemented yet
+	GetIssue(id int) (Issue, bool) 
 	GetIssues() ([]Issue, []time.Time)
-	Update(string, []Issue, time.Time, *string) 
+	Commit(string, []Issue, time.Time, *string) 
+
+	// StartCommitGroup/EndCommitGroup are used on import to avoid
+	// multiple open/close of connection to repo
+	// TODO: think if some more clear interface may be provided
+	StartCommitGroup() 
+	EndCommitGroup()
+
 	Id() int
 	Path() string
 }

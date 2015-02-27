@@ -13,14 +13,18 @@ import "time"
 import "sync"
 //import "path/filepath"
 
+import "fmt"
+
 // threshold for number of commits to repo
 // before issuing next "garbage collection"
-const gcThreshold = 200
+const gcThreshold = 2048
 
 type issueRepository struct {
 	id   int
 	path string
 	gcCounter int
+	repo *git.Repository
+	mutex *sync.Mutex
 }
 
 var mutex = &sync.Mutex{}
@@ -35,10 +39,19 @@ func getUniqueRepoId() int {
 	return returnId
 }
 
+func (r *issueRepository) lock() {
+	r.mutex.Lock()
+}
+
+func (r *issueRepository) unlock() {
+	r.mutex.Unlock()
+}
+
 func (r *issueRepository) initialize(repoPath string) {
 	r.id = getUniqueRepoId()
 	r.path = repoPath
 	r.gcCounter = 0
+	r.mutex = &sync.Mutex{}
 	// create physical repo
 	repo, err := git.InitRepository(r.path, false)
 	if err != nil {
@@ -92,8 +105,9 @@ func setIgnoreDenyCurrentBranch(rpath string) {
 	}
 }
 
-func (r *issueRepository) GetIssue(id int) (Issue, bool) {
-	issues, _ := r.GetIssues()
+// TODO: rewrite this method to avoid parsing all issues
+func (r *issueRepository) GetIssue(id int) (Issue, bool) { 
+	issues, _ := r.GetIssues() 
 	for _, issue := range issues {
 		if issue.Id == id {
 			return issue, true
@@ -103,11 +117,11 @@ func (r *issueRepository) GetIssue(id int) (Issue, bool) {
 }
 
 func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
-	repo, _ := git.OpenRepository(r.path)
-	defer repo.Free()
-
-	copts := &git.CheckoutOpts{Strategy: git.CheckoutForce}
-	repo.CheckoutHead(copts) // sync local dir
+	r.lock()
+	r.openRepoConnectionAndSyncLocalCopy()
+	defer r.closeRepoConnection()
+	defer r.unlock()
+	repo := r.repo
 
 	idx, err := repo.Index()
 	if err != nil {
@@ -305,11 +319,40 @@ func mkIssueIdToPathMap(idx *git.Index) map[int]string {
 	return idToPathMap
 }
 
-func (r *issueRepository) Update(message string, issues []Issue, tm time.Time, updateAuthor *string) {
-	repo, _ := git.OpenRepository(r.path)
-	defer repo.Free()
+func (r *issueRepository) StartCommitGroup() {
+	r.lock()
+	r.openRepoConnectionAndSyncLocalCopy()
+}
 
-	repo.CheckoutHead(nil) // sync local dir
+func (r *issueRepository) EndCommitGroup() {
+	r.closeRepoConnection()
+	r.unlock()
+}
+
+func (r *issueRepository) openRepoConnectionAndSyncLocalCopy() {
+	repo, err := git.OpenRepository(r.path)
+	if err != nil {
+		panic(err)
+	}
+	copts := &git.CheckoutOpts{Strategy: git.CheckoutForce}
+	repo.CheckoutHead(copts) // sync local dir
+	r.repo = repo
+}
+
+func (r *issueRepository) closeRepoConnection() {
+	r.repo.Free()
+	r.repo = nil
+}
+
+func (r *issueRepository) Commit(message string, issues []Issue, tm time.Time, updateAuthor *string) {
+	if r.repo == nil { // Can be non-nil if we are inside commit group
+		r.lock()
+		r.openRepoConnectionAndSyncLocalCopy()
+		defer r.closeRepoConnection()
+		defer r.unlock()
+	}
+
+	repo := r.repo
 
 	idx, err := repo.Index()
 	if err != nil {
@@ -395,8 +438,9 @@ func (r *issueRepository) Update(message string, issues []Issue, tm time.Time, u
 	}
 
 	r.gcCounter++
-	if r.gcCounter == gcThreshold {
+	if r.gcCounter >= gcThreshold {
 		r.doGarbageCollection()
+		fmt.Println("Do garbage collection")
 		r.gcCounter = 0
 	}
 }

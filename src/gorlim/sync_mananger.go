@@ -35,23 +35,36 @@ func Create() *SyncManager {
 
 // TBD: idea is that we don't nee third parameter is first paramter will be real WebIssue interface with getIssues method
 func (sm *SyncManager) InitGitRepoFromIssues(webIssuesUri string, repo IssueRepositoryInterface, issues []Issue) {
+	repo.StartCommitGroup()
+	importStartTime := time.Now()
 	for _, issue := range issues {
+		fmt.Printf("Started import of issue %d\n", issue.Id)
+		issueImportStartTime := time.Now()
+
 		issue1 := issue
 		issue1.Comments = []Comment{}
 		issue1.Opened = true
-		repo.Update("webimport Opened issue: " + issue.Title + " " + issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
+		repo.Commit("webimport Opened issue: " + issue.Title + " " + issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
 		for i := 0; i < len(issue.Comments); i++ {
 			issue1.Comments = issue.Comments[0:i] 
-			repo.Update(fmt.Sprintf("webimport: #%v", issue.Comments[i].Text), []Issue{issue1}, *issue.Comments[i].At, &issue.Comments[i].Author)
+			repo.Commit(fmt.Sprintf("webimport: #%v", issue.Comments[i].Text), []Issue{issue1}, *issue.Comments[i].At, &issue.Comments[i].Author)
 		}
 		if issue.Opened == false {
 			if issue.Assignee == "" {
-				repo.Update("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, nil)
+				repo.Commit("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, nil)
 			} else {
-				repo.Update("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, &issue.Assignee)
+				repo.Commit("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, &issue.Assignee)
 			}
 		}
+
+        issueImportEndTime := time.Now()
+        timePassed := issueImportEndTime.Sub(issueImportStartTime)
+		fmt.Printf("Finished import of issue %d ms %d\n", issue.Id, int64(timePassed/time.Millisecond))
 	}
+	importEndTime := time.Now()
+	timePassed := importEndTime.Sub(importStartTime)
+	fmt.Printf("Finished import of issues: sec %d\n", int64(timePassed/time.Second))
+	repo.EndCommitGroup()
 	gwp := sm.idToReposMap[repo.Id()]
 	gwp.webUpdateTimestamp = time.Now()
 	sm.idToReposMap[repo.Id()] = gwp
@@ -88,7 +101,7 @@ func (sm *SyncManager) SubscribeToWebUpdateEvent(webupdate <-chan IssuesUpdate) 
 			repo := sm.uriToReposMap[uri].repo
 			fmt.Println(uri)
 			for _, issue := range issues {
-				repo.Update("webimport: "+issue.Title, []Issue{issue}, time.Now(), nil)
+				repo.Commit("webimport: "+issue.Title, []Issue{issue}, time.Now(), nil)
 			}
 		}
 	}()
