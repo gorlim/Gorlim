@@ -167,8 +167,9 @@ func initUser(code string, ch chan error) {
 		ch <- err
 		return
 	}
+	access_token := values.Get("access_token")
 	t := &oauth.Transport{
-		Token: &oauth.Token{AccessToken: values.Get("access_token")},
+		Token: &oauth.Token{AccessToken: access_token},
 	}
 	client := github.NewClient(t.Client())
 	user, _, err := client.Users.Get("")
@@ -209,7 +210,7 @@ func initUser(code string, ch chan error) {
 		}
 		options.Page = resp.NextPage
 	}
-	(*st).SaveGithubAuth(login, code)
+	(*st).SaveGithubAuth(login, access_token)
 }
 
 func createOurRepo(myType, user, repoName string) {

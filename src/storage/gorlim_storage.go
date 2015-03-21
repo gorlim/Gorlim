@@ -9,7 +9,7 @@ import (
 
 type Storage interface {
 	GetGithubAuth(user string) (string, error)
-	SaveGithubAuth(user, auth string) error
+	SaveGithubAuth(user string, auth string) error
 	GetRepos(needle string) ([]*Repo, error)
 	GetRepo(needle string) (*Repo, error)
 	AddRepo(myType string, origin string, last time.Time, ready bool) error
@@ -27,13 +27,13 @@ type repoImpl struct {
 	noRepos    []*Repo
 }
 
-func (r repoImpl) SaveGithubAuth(user, auth string) error {
+func (r repoImpl) SaveGithubAuth(user string, auth string) error {
 	stmt, err := r.connection.Prepare("insert or replace into github_auth (login, auth) values(?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Query(user, auth)
+	_, err = stmt.Exec(user, auth)
 	return err
 }
 
