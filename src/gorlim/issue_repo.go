@@ -143,7 +143,7 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 			splitIndex++
 		}
 		if split[splitIndex][0] == '@' {
-			issue.Assignee = split[splitIndex]
+			issue.Assignee = split[splitIndex][1:]
 			splitIndex++
 		}
 		if split[splitIndex][0] == '#' {
@@ -198,7 +198,7 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	// Parse Pull Request
 	for ; i < textLength; i++ {
 		if strings.Contains(text[i], "Patch:") {
-			issue.Title = strings.TrimSpace(strings.Split(text[i], ":")[1])
+			issue.PullRequest = strings.TrimSpace(strings.Split(text[i], ":")[1])
 			i++
 			break
 		}
@@ -211,11 +211,13 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	for ; i < textLength; i++ {
 		if strings.Contains(text[i], "Labels:") {
 			split := strings.Split(text[i], ":")
-			labels := split[1]
-			split = strings.Split(labels, ",")
-			for _, label := range split {
-				issue.Labels = append(issue.Labels, strings.TrimSpace(label))
-			}
+			labels := strings.TrimSpace(split[1])
+			if (len(labels) > 0) {
+				split = strings.Split(labels, ",")
+				for _, label := range split {
+					issue.Labels = append(issue.Labels, strings.TrimSpace(label))
+				}
+			}	
 			i++
 			break
 		}

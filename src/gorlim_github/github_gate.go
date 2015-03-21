@@ -6,6 +6,7 @@ import (
 	"gorlim"
 	"net/http"
 	"time"
+	"strconv"
 )
 
 var DEFAULT_DATE time.Time = time.Unix(0, 0)
@@ -213,27 +214,42 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 }
 
 func SetIssues(owner string, repo string, client *http.Client, date time.Time, issues []gorlim.Issue) {
-	/*fmt.Println("github_gate.SetIssues")
+	// TBD: Handle comments
+	// TBD: Creation of new milestones
+	// TBD: support for creation of new issues (now only editing works)
+
+	fmt.Println("github_gate.SetIssues")
+
 	gh := github.NewClient(client)
 	issueService := gh.Issues
 
-	for issue := range issues {
+	for _, issue := range issues {
 		title := issue.Title
 		body := issue.Description
 		assignee := issue.Assignee
-		milestone := issue.Milestone
 		labels := issue.Labels
-		state := "open"
-	request := github.IssueRequest {
-		Title: &title,
-		Body: &body,
-		Assignee: &assignee,
-		State: &state,
+		var state string
+		if issue.Opened {
+			state = "open" 
+		} else {
+		 	state = "closed"
+		}
+		request := github.IssueRequest {
+			Title: &title,
+			Body: &body,
+			Assignee: &assignee,
+			State: &state,
+			Labels: labels,
+			Milestone: nil,
+		}
+		milestone, err := strconv.Atoi(issue.Milestone)
+		if err == nil {
+			request.Milestone = &milestone
+		}
+		fmt.Printf("Edit request for issue send to github.issues %d\n", issue.Id)
+		_, _, err = issueService.Edit(owner, repo, issue.Id, &request)
+		if err != nil {
+			panic(err)
+		}
 	}
-
-	}
-	_, _, err = issueService.Create("LeonidChistov", "Test", &request)
-	if err != nil {
-		panic(err)
-	}*/
 }
