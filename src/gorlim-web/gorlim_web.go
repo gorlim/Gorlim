@@ -25,7 +25,7 @@ const ADD_SUFFIX = "/add_project"
 
 var db *storage.Storage
 
-var syncManager gorlim.SyncManager = *gorlim.Create()
+var syncManager *gorlim.SyncManager = nil
 var conf configuration = configuration{}
 
 type configuration struct {
@@ -45,7 +45,7 @@ func main() {
 	}
 	http.Handle("/", http.FileServer(http.Dir("./static/")))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
-	db, err := storage.Create(conf.DbFile)
+	db, err = storage.Create(conf.DbFile)
 	if err != nil {
 		panic(err)
 	}
@@ -118,7 +118,14 @@ func main() {
 	})
 	listener := gorlim.GetPushSocketListener()
 	defer listener.Free()
+	// setup synchronization manager
+	githubIssuesWeb := GithubWebIssuesInterface { 
+		clientId: conf.ClientId,
+		secretId: conf.SecretId,
+	}
+	syncManager = gorlim.CreateSyncManager(&githubIssuesWeb)
 	syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
+	// go to listen and serve loop
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
@@ -178,12 +185,7 @@ func initUser(code string, ch chan error) {
 		return
 	}
 	login := *user.Login
-	st, err := storage.Create(conf.DbFile)
-	if err != nil {
-		ch <- err
-		return
-	}
-	_, err = (*st).GetGithubAuth(login)
+	_, err = (*db).GetGithubAuth(login)
 	f, err := os.OpenFile(conf.KeyStorage, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		ch <- err
@@ -210,42 +212,71 @@ func initUser(code string, ch chan error) {
 		}
 		options.Page = resp.NextPage
 	}
-	(*st).SaveGithubAuth(login, access_token)
+	(*db).SaveGithubAuth(login, access_token)
+}
+
+type GithubWebIssuesInterface struct {
+	clientId string
+	secretId string
+}
+
+func (gwi *GithubWebIssuesInterface) SetIssues(uri string, issues []gorlim.Issue) {
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	access_token, err := (*db).GetGithubAuth(owner)
+	if err != nil {
+		panic(err)
+	}
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: access_token},
+	}
+	gorlim_github.SetIssues(owner, repo, t.Client(), time.Now(), issues)
+}
+
+func (gwi *GithubWebIssuesInterface) GetIssues(uri string, date *time.Time) []gorlim.Issue {
+	t := &github.UnauthenticatedRateLimitedTransport{
+		ClientID:     gwi.clientId,
+		ClientSecret: gwi.secretId,
+	}
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	return gorlim_github.GetIssues(owner, repo, t.Client(), date)
+}
+
+func (gwi *GithubWebIssuesInterface) CreateIssuesUpdateChannel(uri string) <-chan gorlim.IssuesUpdate {
+	ch := make(chan gorlim.IssuesUpdate)
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	ticker := time.NewTicker(time.Minute)
+	go func() {
+		for now := range ticker.C {
+			t := &github.UnauthenticatedRateLimitedTransport{
+				ClientID:     gwi.clientId,
+				ClientSecret: gwi.secretId,
+			}
+			date := now
+			issues := gorlim_github.GetIssues(owner, repo, t.Client(), &date)
+			ch <- gorlim.IssuesUpdate{Uri: uri, Issues: issues}
+		}
+	}()
+	return ch
+}
+
+func (gwi *GithubWebIssuesInterface) uriToOwnerRepoPair(uri string) (string, string) {
+	owner := strings.Split(uri, "/")[0]
+	repo := strings.Split(uri, "/")[1]
+	return owner, repo
 }
 
 func createOurRepo(myType, user, repoName string) {
-	t := &github.UnauthenticatedRateLimitedTransport{
-		ClientID:     conf.ClientId,
-		ClientSecret: conf.SecretId,
-	}
-	date := time.Now()
-	issues := gorlim_github.GetIssues(user, repoName, t.Client(), nil)
 	key := user + "/" + repoName
 	path := conf.GitRoot + "/" + key + ".issues"
 	fmt.Println(path)
 	repo := gorlim.CreateRepo(path)
-	syncManager.AddRepository(key, repo)
-	syncManager.InitGitRepoFromIssues(key, repo, issues)
-	st, err := storage.Create(conf.DbFile)
+	syncManager.InitGitRepoFromIssues(key, repo)
+	r, err := (*db).GetRepo(key)
 	if err != nil {
 		return
 	}
-	r, err := (*st).GetRepo(key)
-	if err != nil {
-		return
-	}
-	ch := make(chan gorlim.IssuesUpdate)
-	syncManager.SubscribeToWebUpdateEvent(ch)
 	prev := *r
-	(*st).AddRepo(*prev.Type, *prev.Origin, *prev.Last, true)
-	ticker := time.NewTicker(time.Minute)
-	go func() {
-		for now := range ticker.C {
-			issues := gorlim_github.GetIssues(user, repoName, t.Client(), &date)
-			date = now
-			ch <- gorlim.IssuesUpdate{Uri: key, Issues: issues}
-		}
-	}()
+	(*db).AddRepo(*prev.Type, *prev.Origin, *prev.Last, true)
 }
 
 func prettyError(w http.ResponseWriter, text string) {

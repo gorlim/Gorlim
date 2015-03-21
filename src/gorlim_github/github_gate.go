@@ -212,6 +212,28 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 	return iss
 }
 
-func SetIssues(owner string, repo string, client *http.Client, date string, issues []gorlim.Issue) {
+func SetIssues(owner string, repo string, client *http.Client, date time.Time, issues []gorlim.Issue) {
+	/*fmt.Println("github_gate.SetIssues")
+	gh := github.NewClient(client)
+	issueService := gh.Issues
 
+	for issue := range issues {
+		title := issue.Title
+		body := issue.Description
+		assignee := issue.Assignee
+		milestone := issue.Milestone
+		labels := issue.Labels
+		state := "open"
+	request := github.IssueRequest {
+		Title: &title,
+		Body: &body,
+		Assignee: &assignee,
+		State: &state,
+	}
+
+	}
+	_, _, err = issueService.Create("LeonidChistov", "Test", &request)
+	if err != nil {
+		panic(err)
+	}*/
 }
