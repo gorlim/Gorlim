@@ -6,6 +6,7 @@ type IssueRepositoryInterface interface {
 	GetIssue(id int) (Issue, bool) 
 	GetIssues() ([]Issue, []time.Time)
 	Commit(string, []Issue, time.Time, *string) 
+	Compare(string)
 
 	// StartCommitGroup/EndCommitGroup are used on import to avoid
 	// multiple open/close of connection to repo

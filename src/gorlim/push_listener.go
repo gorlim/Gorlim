@@ -1,72 +1,84 @@
 package gorlim
 
-import "os"
-import "time"
-import "syscall"
-//import "fmt"
+import "net"
+import "bufio"
+import "fmt"
+import "strconv"
+import "strings"
 
-type IntegerSocketListener struct {
-    event chan int
-    pipeName string
+type RepoPrePushMessage struct {
+  RepoId int
+  Sha string
 }
 
-func GetPushSocketListener() *IntegerSocketListener {
-    if pushSocketListener == nil {
-    	os.MkdirAll(getPushPipeDir(), 0777)
-        pushSocketListener = CreateSocketListener(getPushPipeName())
+type RepoPrePushReply struct {
+  Status bool
+  Err string
+}
+
+type PrePushListener struct {
+  event chan RepoPrePushMessage
+  reply chan RepoPrePushReply
+  exit chan bool
+}
+
+func CreatePrePushListener() PrePushListener {
+  listener := PrePushListener{}
+  listener.event = make(chan RepoPrePushMessage)
+  listener.exit = make(chan bool)
+  listener.reply = make(chan RepoPrePushReply)
+
+  ln, err := net.Listen("tcp", ":8081")
+  if err != nil {
+    panic(err)
+  }
+
+  go func() {
+    for {
+      select {
+      case _ = <-listener.exit:
+        break
+      default:
+      }
+
+      conn, err := ln.Accept()
+      if (err != nil) {
+        continue
+      }
+
+      go func() {
+        message, _ := bufio.NewReader(conn).ReadString('\n')
+        fmt.Print("Message Received:", string(message))
+        split := strings.Split(message, " ")
+        id, _ := strconv.Atoi(split[0])
+        ppm := RepoPrePushMessage{
+          RepoId: id,
+          Sha: split[2],
+        }
+        listener.event <- ppm
+        reply := <- listener.reply
+        if reply.Status {
+          conn.Write([]byte("OK\n"))  
+        } else {
+          conn.Write([]byte("Error: " + reply.Err + "\n"))  
+        }       
+      } ();
     }
-    return pushSocketListener
+  } ();
+
+  return listener;
 }
 
-func CreateSocketListener(pipeName string) *IntegerSocketListener {
-	sckListener := &IntegerSocketListener{}
-	sckListener.event = make(chan int, 16) // TODO buffer size
-	sckListener.pipeName = pipeName
-	syscall.Mkfifo(pipeName, 0666)
-	subscribeToPushEvent(pipeName, sckListener.event)
-	return sckListener
+func (ppl* PrePushListener) GetPrePushChannel() <-chan RepoPrePushMessage {
+  return ppl.event;
 }
 
-func (isl* IntegerSocketListener) GetSocketWriteEvent() <-chan int {
-  return isl.event;
+func (ppl* PrePushListener) GetReplyChannel() chan<- RepoPrePushReply {
+  return ppl.reply;
 }
 
-func (isl* IntegerSocketListener) Free() {
-  close(isl.event)
-  os.Remove(isl.pipeName)
+func (ppl* PrePushListener) Close() {
+  close(ppl.event)
+  ppl.exit <- true
 }
 
-var pushSocketListener *IntegerSocketListener
-
-func getPushPipeName() string {
-    return getPushPipeDir() +  "/pushntfifo"
-}
-
-func getPushPipeDir() string {
-    return os.Getenv("HOME") +  "/syncpipes"
-}
-
-func subscribeToPushEvent(pipe string, notify chan<- int) {
-  	go func() {
-  		f, err := os.Open(pipe)
-		if err != nil {
-			panic (err)
-		}
-  		for {
-  	   		bytes :=  make([]byte, 16)
-  	   		n, _ := f.Read(bytes)
-         	if n != 0 {
-         		//fmt.Println("Read bytes")
-           		repoId := 0
-           		for i := 0; i < n - 1; i++ {
-             		repoId = repoId * 10 + int(bytes[i] - 48);
-           		}
-           		notify <- repoId // TODO
-         	} else { //ugly
-         	//fmt.Println("Before sleep")
-            	time.Sleep(time.Second)
-            //fmt.Println("After sleep")
-        	}
-  		}
-  	}()
-}

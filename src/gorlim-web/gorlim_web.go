@@ -116,15 +116,15 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	})
-	listener := gorlim.GetPushSocketListener()
-	defer listener.Free()
+	listener := gorlim.CreatePrePushListener()
+	defer listener.Close()
 	// setup synchronization manager
 	githubIssuesWeb := GithubWebIssuesInterface { 
 		clientId: conf.ClientId,
 		secretId: conf.SecretId,
 	}
 	syncManager = gorlim.CreateSyncManager(&githubIssuesWeb)
-	syncManager.SubscribeToPushEvent(listener.GetSocketWriteEvent())
+	syncManager.SubscribeToPrePushEvent(listener.GetPrePushChannel(), listener.GetReplyChannel())
 	// go to listen and serve loop
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)

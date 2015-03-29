@@ -64,21 +64,78 @@ func (r *issueRepository) initialize(repoPath string) {
 	pre, err := os.Create(r.path + "/.git/hooks/pre-receive")
 	if err != nil {
 		panic(err)
-	}
+	}	
 	defer pre.Close()
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
-	pre.WriteString("exit 0\n")
+	pre.WriteString("read oldrev newrev refname\n")
+	pre.WriteString("/home/leo/pre_push_hook " + strconv.Itoa(r.id) + " $oldrev $newrev\n")
 	// setup post-receive hook
-	post, err := os.Create(r.path + "/.git/hooks/post-receive")
+	/*post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
 		panic(err)
 	}
 	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
-	post.WriteString("echo " + strconv.Itoa(r.id) + " >" + getPushPipeName())
+	post.WriteString("echo " + strconv.Itoa(r.id) + " >" + getPushPipeName())*/
 	return
+}
+
+func (r *issueRepository) Compare(sha string) {
+	r.lock()
+	r.openRepoConnectionAndSyncLocalCopy()
+	defer r.closeRepoConnection()
+	defer r.unlock()
+	
+	repo := r.repo
+	bsha := make([]byte, 20)
+	for i := 0; i < 10; i++ {
+		bsha[i] = sha[2 * i] * 16 + sha[2 * i + 1]
+	}
+	oid := git.NewOidFromBytes(bsha)
+	// find commits
+	head, _ := repo.Head()
+	c1, err := repo.LookupCommit(head.Target())
+	if err != nil {
+		panic("Failed to find commit by oid")
+	}
+	c2, err := repo.LookupCommit(oid)
+	if err != nil {
+		panic("Failed to find commit by oid")
+	}
+	// get commit trees
+	t1, err := c1.Tree()
+	if err != nil {
+		panic(err)
+	}
+	t2, err := c2.Tree()
+	if err != nil {
+		panic(err)
+	}
+	// get diff
+	diffOpts, _ := git.DefaultDiffOptions()
+	diff, err := repo.DiffTreeToTree(t1, t2, &diffOpts)
+	if err != nil {
+		panic(err)
+	}
+	var modified []string  
+	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
+		if (dd.Status != git.DeltaModified) {
+			panic("Cannot handle changes other than file modification!")
+		}
+		path := dd.OldFile.Path
+		modified = append(modified, path)
+		return nil, nil
+	}
+	if err = diff.ForEach(callback, git.DiffDetailFiles); err != nil {
+		panic(err)
+	}
+	// ..
+	fmt.Println("Following files modified: ")
+	for _, issuePath := range modified {
+		fmt.Println(issuePath)
+	}
 }
 
 func setIgnoreDenyCurrentBranch(rpath string) {

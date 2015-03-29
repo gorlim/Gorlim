@@ -29,6 +29,7 @@ func CreateSyncManager(iWebIssues WebIssuesInterface) *SyncManager {
 	}
 }
 
+// TBD: we should be able to init repo info from existing db!
 func (sm *SyncManager) InitGitRepoFromIssues(uri string, emptyGitRepo IssueRepositoryInterface) {
 	issues := sm.webIssues.GetIssues(uri, nil)
 	repo := emptyGitRepo
@@ -74,11 +75,17 @@ func (sm *SyncManager) InitGitRepoFromIssues(uri string, emptyGitRepo IssueRepos
 	sm.listenToWebUpdateEvent(sm.webIssues.CreateIssuesUpdateChannel(uri))
 }
 
-func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
+func (sm *SyncManager) SubscribeToPrePushEvent(prePushEvent <-chan RepoPrePushMessage, reply chan<- RepoPrePushReply) {
 	go func() {
-		for push := range pushevent {
-			info := sm.idToInfoMap[push]
+		for prePush := range prePushEvent {
+			info := sm.idToInfoMap[prePush.RepoId]
 			repo := info.GitRepo
+			fmt.Printf("Calling repo compare %d\n", prePush.RepoId)
+			if repo == nil {
+				panic("NIL!")
+			}
+			repo.Compare(prePush.Sha)
+			/*
 			issues, timestamps := repo.GetIssues()
 			currentTime := time.Now()
 			for index, tm := range timestamps {
@@ -90,7 +97,7 @@ func (sm *SyncManager) SubscribeToPushEvent(pushevent <-chan int) {
 				}
 			}
 			info.WebUpdateTimestamp = currentTime
-			sm.idToInfoMap[push] = info
+			sm.idToInfoMap[push] = info*/
 		}
 	}()
 }
