@@ -82,23 +82,30 @@ func (r *issueRepository) initialize(repoPath string) {
 	return
 }
 
+func blobToIssue(blob []byte) []string {
+	// Well, that is potentially wrong because of different encodings
+	str := string(blob[:len(blob)])
+	return strings.Split(str, "\n")
+}
+
 func (r *issueRepository) Compare(sha string) {
 	r.lock()
 	r.openRepoConnectionAndSyncLocalCopy()
 	defer r.closeRepoConnection()
 	defer r.unlock()
-	
+
 	repo := r.repo
-	bsha := make([]byte, 20)
-	for i := 0; i < 10; i++ {
-		bsha[i] = sha[2 * i] * 16 + sha[2 * i + 1]
+
+	oid, err := git.NewOid(sha)
+	if err != nil {
+		fmt.Println(len(sha))
+		panic(err)
 	}
-	oid := git.NewOidFromBytes(bsha)
 	// find commits
 	head, _ := repo.Head()
 	c1, err := repo.LookupCommit(head.Target())
 	if err != nil {
-		panic("Failed to find commit by oid")
+		panic("Failed to find head commit")
 	}
 	c2, err := repo.LookupCommit(oid)
 	if err != nil {
@@ -119,13 +126,20 @@ func (r *issueRepository) Compare(sha string) {
 	if err != nil {
 		panic(err)
 	}
-	var modified []string  
+	var modified []struct {o Issue; n Issue}  
 	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
 		if (dd.Status != git.DeltaModified) {
 			panic("Cannot handle changes other than file modification!")
 		}
-		path := dd.OldFile.Path
-		modified = append(modified, path)
+		parse := func(file git.DiffFile) Issue {
+			blob, _ := repo.LookupBlob(file.Oid)
+			issue := Issue{}
+			parseIssuePropertiesFromRepoPath(file.Path, &issue)
+			parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
+			return issue
+		}
+		oldIssue, newIssue := parse(dd.OldFile), parse(dd.NewFile)
+		modified = append(modified, struct {o Issue; n Issue} { oldIssue, newIssue })
 		return nil, nil
 	}
 	if err = diff.ForEach(callback, git.DiffDetailFiles); err != nil {
@@ -133,8 +147,9 @@ func (r *issueRepository) Compare(sha string) {
 	}
 	// ..
 	fmt.Println("Following files modified: ")
-	for _, issuePath := range modified {
-		fmt.Println(issuePath)
+	for _, m := range modified {
+		fmt.Println(issueToText(m.o))
+		fmt.Println(issueToText(m.n))
 	}
 }
 
@@ -192,25 +207,8 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 	for i := 0; i < int(issuesCount); i++ {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
-		split := strings.Split(path, "/")
-		issue := Issue{Opened: split[0] == "open"}
-		splitIndex := 1
-		if split[splitIndex][0] != '@' && split[splitIndex][0] != '#' {
-			issue.Milestone = split[splitIndex]
-			splitIndex++
-		}
-		if split[splitIndex][0] == '@' {
-			issue.Assignee = split[splitIndex][1:]
-			splitIndex++
-		}
-		if split[splitIndex][0] == '#' {
-			issue.Id, err = strconv.Atoi(split[splitIndex][1:])
-			if err != nil {
-				panic("Invalid issue id " + split[splitIndex][1:])
-			}
-		} else {
-			panic("Wrong issue path" + path)
-		}
+		issue := Issue{}
+		parseIssuePropertiesFromRepoPath(path, &issue)
 		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
 			panic(err)
@@ -236,6 +234,29 @@ func readTextFile(file *os.File) []string {
 }
 
 const delimiter string = "----------------------------------"
+
+func parseIssuePropertiesFromRepoPath(path string, issue *Issue) {
+	split := strings.Split(path, "/")
+	issue.Opened = split[0] == "open"
+	splitIndex := 1
+	if split[splitIndex][0] != '@' && split[splitIndex][0] != '#' {
+		issue.Milestone = split[splitIndex]
+		splitIndex++
+	}
+	if split[splitIndex][0] == '@' {
+		issue.Assignee = split[splitIndex][1:]
+		splitIndex++
+	}
+	if split[splitIndex][0] == '#' {
+		id, err := strconv.Atoi(split[splitIndex][1:])
+		if err != nil {
+			panic("Invalid issue id " + split[splitIndex][1:])
+		}
+		issue.Id = id
+	} else {
+		panic("Wrong issue path" + path)
+	}
+}
 
 func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 	i := 0

@@ -48,16 +48,15 @@ func CreatePrePushListener() PrePushListener {
 
       go func() {
         message, _ := bufio.NewReader(conn).ReadString('\n')
-        fmt.Print("Message Received:", string(message))
         split := strings.Split(message, " ")
         id, _ := strconv.Atoi(split[0])
         ppm := RepoPrePushMessage{
           RepoId: id,
-          Sha: split[2],
+          Sha: split[2][0:40],
         }
         listener.event <- ppm
         reply := <- listener.reply
-        if reply.Status {
+        if reply.Status == true {
           conn.Write([]byte("OK\n"))  
         } else {
           conn.Write([]byte("Error: " + reply.Err + "\n"))  

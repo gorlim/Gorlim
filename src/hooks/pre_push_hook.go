@@ -7,7 +7,6 @@ import "os"
 
 func main() {
   // connect to this socket
-  fmt.Println("Hello from handler")
   conn, err := net.Dial("tcp", "127.0.0.1:8081")
   if err != nil {
   	fmt.Print("Error in pre-push-hook: failed to connect to Gorlim")
@@ -24,12 +23,10 @@ func main() {
   // listen for reply
   message, err = bufio.NewReader(conn).ReadString('\n')
   if err != nil {
-  	fmt.Print("Error in pre-push-hook: failed to get reply from Gorlim")
+  	fmt.Print("Error in pre-push-hook: failed to get reply from Gorlim\n")
   	os.Exit(1)
   }
-  fmt.Print(message)
-  if (message != "OK") {
+  if (message[0:2] != "OK") {
   	os.Exit(1)
   }
-
 }

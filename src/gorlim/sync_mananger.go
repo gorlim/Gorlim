@@ -80,11 +80,8 @@ func (sm *SyncManager) SubscribeToPrePushEvent(prePushEvent <-chan RepoPrePushMe
 		for prePush := range prePushEvent {
 			info := sm.idToInfoMap[prePush.RepoId]
 			repo := info.GitRepo
-			fmt.Printf("Calling repo compare %d\n", prePush.RepoId)
-			if repo == nil {
-				panic("NIL!")
-			}
 			repo.Compare(prePush.Sha)
+			reply <- RepoPrePushReply { Status : true }
 			/*
 			issues, timestamps := repo.GetIssues()
 			currentTime := time.Now()
