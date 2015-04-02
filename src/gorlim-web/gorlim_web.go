@@ -116,15 +116,12 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	})
-	listener := gorlim.CreatePrePushListener()
-	defer listener.Close()
 	// setup synchronization manager
 	githubIssuesWeb := GithubWebIssuesInterface { 
 		clientId: conf.ClientId,
 		secretId: conf.SecretId,
 	}
 	syncManager = gorlim.CreateSyncManager(&githubIssuesWeb)
-	syncManager.SubscribeToPrePushEvent(listener.GetPrePushChannel(), listener.GetReplyChannel())
 	// go to listen and serve loop
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
@@ -220,7 +217,7 @@ type GithubWebIssuesInterface struct {
 	secretId string
 }
 
-func (gwi *GithubWebIssuesInterface) SetIssues(uri string, issues []gorlim.Issue) {
+func (gwi *GithubWebIssuesInterface) UpdateIssue(uri string, oldValue gorlim.Issue, newValue gorlim.Issue) error {
 	owner, repo := gwi.uriToOwnerRepoPair(uri)
 	access_token, err := (*db).GetGithubAuth(owner)
 	if err != nil {
@@ -229,7 +226,7 @@ func (gwi *GithubWebIssuesInterface) SetIssues(uri string, issues []gorlim.Issue
 	t := &oauth.Transport{
 		Token: &oauth.Token{AccessToken: access_token},
 	}
-	gorlim_github.SetIssues(owner, repo, t.Client(), time.Now(), issues)
+	return gorlim_github.UpdateIssue(owner, repo, t.Client(), time.Now(), oldValue, newValue)
 }
 
 func (gwi *GithubWebIssuesInterface) GetIssues(uri string, date *time.Time) []gorlim.Issue {

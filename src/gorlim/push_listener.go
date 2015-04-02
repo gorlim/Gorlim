@@ -2,12 +2,10 @@ package gorlim
 
 import "net"
 import "bufio"
-import "fmt"
-import "strconv"
 import "strings"
 
 type RepoPrePushMessage struct {
-  RepoId int
+  RepoPath string
   Sha string
 }
 
@@ -49,9 +47,8 @@ func CreatePrePushListener() PrePushListener {
       go func() {
         message, _ := bufio.NewReader(conn).ReadString('\n')
         split := strings.Split(message, " ")
-        id, _ := strconv.Atoi(split[0])
         ppm := RepoPrePushMessage{
-          RepoId: id,
+          RepoPath: split[0],
           Sha: split[2][0:40],
         }
         listener.event <- ppm

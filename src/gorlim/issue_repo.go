@@ -20,23 +20,51 @@ import "fmt"
 const gcThreshold = 2048
 
 type issueRepository struct {
-	id   int
 	path string
 	gcCounter int
 	repo *git.Repository
 	mutex *sync.Mutex
+	prePushHook PrePushHook
 }
 
 var mutex = &sync.Mutex{}
 var id int = 0
+var listener PrePushListener = CreatePrePushListener()
+var repoMap map[string]*issueRepository = make(map[string]*issueRepository)
 
-func getUniqueRepoId() int {
-	var returnId int
-	mutex.Lock()
-	returnId = id
-	id = id + 1
-	mutex.Unlock()
-	return returnId
+func init() {
+	// listen to pre-push events
+	go func() {
+		for {
+			replyChannel := listener.GetReplyChannel()
+			for prePush := range listener.GetPrePushChannel() {
+				irepo := repoMap[prePush.RepoPath]
+				if irepo.prePushHook == nil {
+					replyChannel <- RepoPrePushReply { Status : true }
+					continue
+				}
+				irepo.establishExclusiveRepoConnection()
+				oid, err := git.NewOid(prePush.Sha)
+				if err != nil {
+					irepo.closeExclusiveRepoConnection()
+					replyChannel <- RepoPrePushReply { Status: false, Err : "invalid commit SHA" }
+					continue
+				}
+				head, _ := irepo.repo.Head()
+				diff := irepo.diff(head.Target(), oid)
+				irepo.closeExclusiveRepoConnection()
+				if err = irepo.prePushHook(diff); err != nil {
+					replyChannel <- RepoPrePushReply { Status: false, Err : err.Error() }
+				} else {
+					replyChannel <- RepoPrePushReply { Status : true }
+				}
+			}
+		}
+	}()
+}
+
+func (r *issueRepository) SetPrePushHook(pph PrePushHook) {
+	r.prePushHook = pph
 }
 
 func (r *issueRepository) lock() {
@@ -48,7 +76,6 @@ func (r *issueRepository) unlock() {
 }
 
 func (r *issueRepository) initialize(repoPath string) {
-	r.id = getUniqueRepoId()
 	r.path = repoPath
 	r.gcCounter = 0
 	r.mutex = &sync.Mutex{}
@@ -69,7 +96,7 @@ func (r *issueRepository) initialize(repoPath string) {
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("read oldrev newrev refname\n")
-	pre.WriteString("/home/leo/pre_push_hook " + strconv.Itoa(r.id) + " $oldrev $newrev\n")
+	pre.WriteString("$(HOME)/pre_push_hook " + repoPath + " $oldrev $newrev\n")
 	// setup post-receive hook
 	/*post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
@@ -88,26 +115,15 @@ func blobToIssue(blob []byte) []string {
 	return strings.Split(str, "\n")
 }
 
-func (r *issueRepository) Compare(sha string) {
-	r.lock()
-	r.openRepoConnectionAndSyncLocalCopy()
-	defer r.closeRepoConnection()
-	defer r.unlock()
-
+func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 	repo := r.repo
 
-	oid, err := git.NewOid(sha)
-	if err != nil {
-		fmt.Println(len(sha))
-		panic(err)
-	}
 	// find commits
-	head, _ := repo.Head()
-	c1, err := repo.LookupCommit(head.Target())
+	c1, err := repo.LookupCommit(oldOid)
 	if err != nil {
-		panic("Failed to find head commit")
+		panic("Failed to find commit by oid")
 	}
-	c2, err := repo.LookupCommit(oid)
+	c2, err := repo.LookupCommit(newOid)
 	if err != nil {
 		panic("Failed to find commit by oid")
 	}
@@ -126,31 +142,57 @@ func (r *issueRepository) Compare(sha string) {
 	if err != nil {
 		panic(err)
 	}
-	var modified []struct {o Issue; n Issue}  
+	parseIssue := func(file git.DiffFile) Issue {
+		blob, _ := repo.LookupBlob(file.Oid)
+		issue := Issue{}
+		parseIssuePropertiesFromRepoPath(file.Path, &issue)
+		parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
+		return issue
+	}
+	var modifiedIssuesMap map[int]struct {Old Issue; New Issue}  
+	var newIssues []Issue
 	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
-		if (dd.Status != git.DeltaModified) {
-			panic("Cannot handle changes other than file modification!")
+		switch dd.Status {
+		case git.DeltaModified:
+			oldIssue, newIssue := parseIssue(dd.OldFile), parseIssue(dd.NewFile)
+			modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, newIssue }
+		case git.DeltaAdded:
+			newIssue := parseIssue(dd.NewFile)
+			mod, ok := modifiedIssuesMap[newIssue.Id]
+			if ok {
+				modifiedIssuesMap[newIssue.Id] = struct {Old Issue; New Issue} { mod.Old, newIssue }
+			} else {
+				modifiedIssuesMap[newIssue.Id] = struct {Old Issue; New Issue} { Issue{}, newIssue }
+			}
+		case git.DeltaDeleted:
+			oldIssue := parseIssue(dd.OldFile)
+			mod, ok := modifiedIssuesMap[oldIssue.Id]
+			if ok {
+				modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, mod.New }
+			} else {
+				modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, Issue{} }
+			}
 		}
-		parse := func(file git.DiffFile) Issue {
-			blob, _ := repo.LookupBlob(file.Oid)
-			issue := Issue{}
-			parseIssuePropertiesFromRepoPath(file.Path, &issue)
-			parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
-			return issue
-		}
-		oldIssue, newIssue := parse(dd.OldFile), parse(dd.NewFile)
-		modified = append(modified, struct {o Issue; n Issue} { oldIssue, newIssue })
 		return nil, nil
 	}
 	if err = diff.ForEach(callback, git.DiffDetailFiles); err != nil {
 		panic(err)
 	}
-	// ..
-	fmt.Println("Following files modified: ")
-	for _, m := range modified {
-		fmt.Println(issueToText(m.o))
-		fmt.Println(issueToText(m.n))
+	// temporary debug print
+	fmt.Println("Following issues modified: ")
+	for _, m := range modifiedIssuesMap {
+		fmt.Println(issueToText(m.Old))
+		fmt.Println(issueToText(m.New))
 	}
+	fmt.Println("Following issues : ")
+	// return
+	modifiedIssues := make([]struct {Old Issue; New Issue}, len(modifiedIssuesMap), len(modifiedIssuesMap))
+	index := 0
+	for _, m := range modifiedIssuesMap {
+		modifiedIssues[index] = m
+		index++
+	}
+	return CommitDiff { NewIssues : newIssues, ModifiedIssues: modifiedIssues}
 }
 
 func setIgnoreDenyCurrentBranch(rpath string) {
@@ -189,10 +231,8 @@ func (r *issueRepository) GetIssue(id int) (Issue, bool) {
 }
 
 func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
-	r.lock()
-	r.openRepoConnectionAndSyncLocalCopy()
-	defer r.closeRepoConnection()
-	defer r.unlock()
+	r.establishExclusiveRepoConnection()
+	defer r.closeExclusiveRepoConnection()
 	repo := r.repo
 
 	idx, err := repo.Index()
@@ -400,16 +440,15 @@ func mkIssueIdToPathMap(idx *git.Index) map[int]string {
 }
 
 func (r *issueRepository) StartCommitGroup() {
-	r.lock()
-	r.openRepoConnectionAndSyncLocalCopy()
+	r.establishExclusiveRepoConnection()
 }
 
 func (r *issueRepository) EndCommitGroup() {
-	r.closeRepoConnection()
-	r.unlock()
+	defer r.closeExclusiveRepoConnection()
 }
 
-func (r *issueRepository) openRepoConnectionAndSyncLocalCopy() {
+func (r *issueRepository) establishExclusiveRepoConnection() {
+	r.lock()
 	repo, err := git.OpenRepository(r.path)
 	if err != nil {
 		panic(err)
@@ -419,17 +458,16 @@ func (r *issueRepository) openRepoConnectionAndSyncLocalCopy() {
 	r.repo = repo
 }
 
-func (r *issueRepository) closeRepoConnection() {
+func (r *issueRepository) closeExclusiveRepoConnection() {
 	r.repo.Free()
 	r.repo = nil
+	r.unlock()
 }
 
 func (r *issueRepository) Commit(message string, issues []Issue, tm time.Time, updateAuthor *string) {
 	if r.repo == nil { // Can be non-nil if we are inside commit group
-		r.lock()
-		r.openRepoConnectionAndSyncLocalCopy()
-		defer r.closeRepoConnection()
-		defer r.unlock()
+		r.establishExclusiveRepoConnection()
+		defer r.closeExclusiveRepoConnection()
 	}
 
 	repo := r.repo
@@ -523,10 +561,6 @@ func (r *issueRepository) Commit(message string, issues []Issue, tm time.Time, u
 		fmt.Println("Do garbage collection")
 		r.gcCounter = 0
 	}
-}
-
-func (r *issueRepository) Id() int {
-	return r.id
 }
 
 func (r *issueRepository) Path() string {

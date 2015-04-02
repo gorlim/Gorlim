@@ -6,7 +6,6 @@ import (
 	"gorlim"
 	"net/http"
 	"time"
-	"strconv"
 )
 
 var DEFAULT_DATE time.Time = time.Unix(0, 0)
@@ -213,14 +212,15 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 	return iss
 }
 
-func SetIssues(owner string, repo string, client *http.Client, date time.Time, issues []gorlim.Issue) {
+func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
+                  oldValue gorlim.Issue, newValue gorlim.Issue) error {
 	// TBD: Handle comments
 	// TBD: Creation of new milestones
 	// TBD: support for creation of new issues (now only editing works)
 
 	fmt.Println("github_gate.SetIssues")
 
-	gh := github.NewClient(client)
+	/*gh := github.NewClient(client)
 	issueService := gh.Issues
 
 	for _, issue := range issues {
@@ -251,5 +251,6 @@ func SetIssues(owner string, repo string, client *http.Client, date time.Time, i
 		if err != nil {
 			panic(err)
 		}
-	}
+	}*/
+	return nil
 }
