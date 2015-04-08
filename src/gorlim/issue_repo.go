@@ -38,6 +38,7 @@ func init() {
 		for {
 			replyChannel := listener.GetReplyChannel()
 			for prePush := range listener.GetPrePushChannel() {
+				fmt.Println("Fetch " + prePush.RepoPath)
 				irepo := repoMap[prePush.RepoPath]
 				if irepo.prePushHook == nil {
 					replyChannel <- RepoPrePushReply { Status : true }
@@ -79,6 +80,9 @@ func (r *issueRepository) initialize(repoPath string) {
 	r.path = repoPath
 	r.gcCounter = 0
 	r.mutex = &sync.Mutex{}
+	// save to repo map
+	fmt.Println("Save " + repoPath)
+	repoMap[repoPath] = r
 	// create physical repo
 	repo, err := git.InitRepository(r.path, false)
 	if err != nil {
@@ -96,7 +100,7 @@ func (r *issueRepository) initialize(repoPath string) {
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("read oldrev newrev refname\n")
-	pre.WriteString("$(HOME)/pre_push_hook " + repoPath + " $oldrev $newrev\n")
+	pre.WriteString(os.Getenv("HOME") + "/pre_push_hook " + repoPath + " $oldrev $newrev\n")
 	// setup post-receive hook
 	/*post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
@@ -149,7 +153,7 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 		parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
 		return issue
 	}
-	var modifiedIssuesMap map[int]struct {Old Issue; New Issue}  
+	modifiedIssuesMap := make(map[int]struct {Old Issue; New Issue})
 	var newIssues []Issue
 	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
 		switch dd.Status {
