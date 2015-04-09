@@ -38,7 +38,6 @@ func init() {
 		for {
 			replyChannel := listener.GetReplyChannel()
 			for prePush := range listener.GetPrePushChannel() {
-				fmt.Println("Fetch " + prePush.RepoPath)
 				irepo := repoMap[prePush.RepoPath]
 				if irepo.prePushHook == nil {
 					replyChannel <- RepoPrePushReply { Status : true }
@@ -64,6 +63,18 @@ func init() {
 	}()
 }
 
+func NewGitRepo(repoPath string) IssueRepositoryInterface {
+  repo := issueRepository{}
+  repo.initializeNewRepo(repoPath)
+  return &repo
+}
+
+func CreateFromExistingGitRepo(repoPath string) IssueRepositoryInterface {
+  repo := issueRepository{}
+  repo.initRepoObject(repoPath)
+  return &repo
+}
+
 func (r *issueRepository) SetPrePushHook(pph PrePushHook) {
 	r.prePushHook = pph
 }
@@ -76,13 +87,16 @@ func (r *issueRepository) unlock() {
 	r.mutex.Unlock()
 }
 
-func (r *issueRepository) initialize(repoPath string) {
+func (r *issueRepository) initRepoObject(repoPath string) {
 	r.path = repoPath
 	r.gcCounter = 0
 	r.mutex = &sync.Mutex{}
 	// save to repo map
-	fmt.Println("Save " + repoPath)
 	repoMap[repoPath] = r
+}
+
+func (r *issueRepository) initializeNewRepo(repoPath string) {
+	r.initRepoObject(repoPath)
 	// create physical repo
 	repo, err := git.InitRepository(r.path, false)
 	if err != nil {

@@ -53,6 +53,9 @@ func (sm *SyncManager) InitGitRepoFromIssues(uri string, emptyGitRepo IssueRepos
 	timePassed := importEndTime.Sub(importStartTime)
 	fmt.Printf("Finished import of issues: sec %d\n", int64(timePassed/time.Second))
 	repo.EndCommitGroup()
+}
+
+func (sm *SyncManager) EstablishSync(uri string, repo IssueRepositoryInterface) {
 	// subscribe to web updates
 	sm.listenToWebUpdateEvent(sm.webIssues.CreateIssuesUpdateChannel(uri), repo)
 	// subscribe to pre-push event

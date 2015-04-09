@@ -10,6 +10,7 @@ import (
 type Storage interface {
 	GetGithubAuth(user string) (string, error)
 	SaveGithubAuth(user string, auth string) error
+	GetAllRepos() ([]*Repo, error)
 	GetRepos(needle string) ([]*Repo, error)
 	GetRepo(needle string) (*Repo, error)
 	AddRepo(myType string, origin string, last time.Time, ready bool) error
@@ -104,6 +105,29 @@ func (r repoImpl) GetRepos(needle string) ([]*Repo, error) {
 	}
 	defer stmt.Close()
 	rows, err := stmt.Query("%" + needle + "%")
+	if err != nil {
+		return r.noRepos, err
+	}
+	defer rows.Close()
+	result := make([]*Repo, 0, 20)
+	for rows.Next() {
+		var last time.Time
+		var origin string
+		var myType string
+		var ready bool
+		rows.Scan(&myType, &origin, &last, &ready)
+		result = append(result, &Repo{Origin: &origin, Last: &last, Type: &myType, Ready: &ready})
+	}
+	return result, nil
+}
+
+func (r repoImpl) GetAllRepos() ([]*Repo, error) {
+	stmt, err := r.connection.Prepare("select type, origin, last, ready from repositories")
+	if err != nil {
+		return r.noRepos, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query()
 	if err != nil {
 		return r.noRepos, err
 	}

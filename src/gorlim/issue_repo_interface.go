@@ -27,9 +27,3 @@ type IssueRepositoryInterface interface {
 
 	Path() string
 }
-
-func CreateRepo (repoPath string) IssueRepositoryInterface {
-  repo := issueRepository{}
-  repo.initialize(repoPath)
-  return &repo
-}

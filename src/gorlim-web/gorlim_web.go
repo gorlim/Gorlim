@@ -122,6 +122,19 @@ func main() {
 		secretId: conf.SecretId,
 	}
 	syncManager = gorlim.CreateSyncManager(&githubIssuesWeb)
+	// init existing repos from database
+	repos, err := (*db).GetAllRepos()
+	if err != nil {
+		panic(err) // TBD - show to user
+	}
+	if repos != nil {
+		for _, repo := range repos {
+			origin := *repo.Origin
+			path := getRepoPath(origin)
+			repo := gorlim.CreateFromExistingGitRepo(path)
+			syncManager.EstablishSync(origin, repo)
+		}
+	}	
 	// go to listen and serve loop
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
@@ -262,12 +275,17 @@ func (gwi *GithubWebIssuesInterface) uriToOwnerRepoPair(uri string) (string, str
 	return owner, repo
 }
 
+func getRepoPath(repo string) string {
+	return conf.GitRoot + "/" + repo + ".issues"
+}
+
 func createOurRepo(myType, user, repoName string) {
 	key := user + "/" + repoName
-	path := conf.GitRoot + "/" + key + ".issues"
+	path := getRepoPath(key)
 	fmt.Println(path)
-	repo := gorlim.CreateRepo(path)
+	repo := gorlim.NewGitRepo(path)
 	syncManager.InitGitRepoFromIssues(key, repo)
+	syncManager.EstablishSync(key, repo)
 	r, err := (*db).GetRepo(key)
 	if err != nil {
 		return
