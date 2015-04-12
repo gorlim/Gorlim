@@ -3,7 +3,7 @@ package gorlim_github
 import (
 	"fmt"
 	"github.com/google/go-github/github"
-	"gorlim"
+	"github.com/gorlim/Gorlim/gorlim"
 	"net/http"
 	"time"
 )
@@ -213,7 +213,7 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 }
 
 func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
-                  oldValue gorlim.Issue, newValue gorlim.Issue) error {
+	oldValue gorlim.Issue, newValue gorlim.Issue) error {
 	// TBD: Handle comments
 	// TBD: Creation of new milestones
 	// TBD: support for creation of new issues (now only editing works)
@@ -230,7 +230,7 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 		labels := issue.Labels
 		var state string
 		if issue.Opened {
-			state = "open" 
+			state = "open"
 		} else {
 		 	state = "closed"
 		}
