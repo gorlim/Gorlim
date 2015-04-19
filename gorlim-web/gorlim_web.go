@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
-	"github.com/gorlim/Gorlim/gorlim"
+    "github.com/gorlim/Gorlim/gorlim"
 	"github.com/gorlim/Gorlim/gorlim_github"
 	"github.com/gorlim/Gorlim/storage"
 	"io/ioutil"
@@ -117,7 +117,7 @@ func main() {
 		w.Write(js)
 	})
 	// setup synchronization manager
-	githubIssuesWeb := GithubWebIssuesInterface{
+	githubIssuesWeb := GithubWebIssuesInterface{ 
 		clientId: conf.ClientId,
 		secretId: conf.SecretId,
 	}
@@ -134,7 +134,7 @@ func main() {
 			repo := gorlim.CreateFromExistingGitRepo(path)
 			syncManager.EstablishSync(origin, repo)
 		}
-	}
+	}	
 	// go to listen and serve loop
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
@@ -252,17 +252,20 @@ func (gwi *GithubWebIssuesInterface) GetIssues(uri string, date *time.Time) []go
 }
 
 func (gwi *GithubWebIssuesInterface) CreateIssuesUpdateChannel(uri string) <-chan gorlim.IssuesUpdate {
+	fmt.Println("CreateIssuesUpdateChannel")
 	ch := make(chan gorlim.IssuesUpdate)
 	owner, repo := gwi.uriToOwnerRepoPair(uri)
 	ticker := time.NewTicker(time.Minute)
 	go func() {
+		date := time.Now()
 		for now := range ticker.C {
+			fmt.Println("Tick")
 			t := &github.UnauthenticatedRateLimitedTransport{
 				ClientID:     gwi.clientId,
 				ClientSecret: gwi.secretId,
 			}
-			date := now
 			issues := gorlim_github.GetIssues(owner, repo, t.Client(), &date)
+			date = now
 			ch <- gorlim.IssuesUpdate{Uri: uri, Issues: issues}
 		}
 	}()

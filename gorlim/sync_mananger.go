@@ -34,7 +34,7 @@ func (sm *SyncManager) InitGitRepoFromIssues(uri string, emptyGitRepo IssueRepos
 		issue1.Opened = true
 		repo.Commit("webimport Opened issue: " + issue.Title + " " + issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
 		for i := 0; i < len(issue.Comments); i++ {
-			issue1.Comments = issue.Comments[0:i] 
+			issue1.Comments = issue.Comments[0 : i + 1] 
 			repo.Commit(fmt.Sprintf("webimport: #%v", issue.Comments[i].Text), []Issue{issue1}, *issue.Comments[i].At, &issue.Comments[i].Author)
 		}
 		if issue.Opened == false {
@@ -69,6 +69,7 @@ func (sm *SyncManager) subscribeToPrePushEvent(repo IssueRepositoryInterface, we
 			for _, mod := range commitDiff.ModifiedIssues {
 				err := sm.webIssues.UpdateIssue(webUri, mod.Old, mod.New)
 				if err != nil {
+					panic(err) // TEMP
 					return err
 				}
 			}
@@ -83,7 +84,10 @@ func (sm *SyncManager) listenToWebUpdateEvent(webupdate <-chan IssuesUpdate, rep
 		for wupd := range webupdate {
 			issues := wupd.Issues
 			for _, issue := range issues {
-				repo.Commit("webimport: "+issue.Title, []Issue{issue}, time.Now(), nil)
+				gitIssue, exists := repo.GetIssue(issue.Id)
+				if !exists || !gitIssue.Equals(issue) {
+					repo.Commit("webimport: "+issue.Title, []Issue{issue}, time.Now(), nil)
+				}
 			}
 		}
 	}()

@@ -6,6 +6,8 @@ import (
 	"github.com/gorlim/Gorlim/gorlim"
 	"net/http"
 	"time"
+	"errors"
+	"strconv"
 )
 
 var DEFAULT_DATE time.Time = time.Unix(0, 0)
@@ -96,10 +98,29 @@ func getGithubIssues(owner string, repo string, client *github.Client, date *tim
 	return result, nil
 }
 
-func getGithubIssueComments(owner string, repo string, client *github.Client, date *time.Time) map[string][]github.IssueComment {
-	if date == nil {
-		date = &DEFAULT_DATE
+func getGithubIssueComments(owner string, repo string, client *github.Client, issueId int) []github.IssueComment {
+	date := &DEFAULT_DATE
+	clo := &github.IssueListCommentsOptions{Since: *date}
+	issuesService := client.Issues
+	comments := make([]github.IssueComment, 0)
+	for {
+		pageComments, resp, err := issuesService.ListComments(owner, repo, issueId, clo)
+		fmt.Printf("Number of fetched comments %d\n", len(pageComments))
+		if err != nil {
+			panic(err)
+		}
+		comments = append(comments, pageComments...)
+	    fmt.Printf("Number of updated comments %d\n", len(comments))
+		clo.ListOptions.Page = resp.NextPage
+		if resp.NextPage == 0 {
+			break
+		}
 	}
+	return comments
+}
+
+func getGithubIssuesComments(owner string, repo string, client *github.Client) map[string][]github.IssueComment {
+	date := &DEFAULT_DATE
 	clo := &github.IssueListCommentsOptions{Since: *date}
 	clo.ListOptions = github.ListOptions{PerPage: 100}
 	issuesService := client.Issues
@@ -199,7 +220,15 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 		panic(err)
 	}
 	iss := make([]gorlim.Issue, 0, len(gIssues))
-	comments := getGithubIssueComments(owner, repo, gh, date)
+	var comments map[string][]github.IssueComment
+    if date == nil {
+		comments = getGithubIssuesComments(owner, repo, gh)
+	} else {
+		comments = make(map[string][]github.IssueComment)
+		for _, issue  := range gIssues {
+			comments[*issue.URL] = getGithubIssueComments(owner, repo, gh, *issue.Number)
+		}
+	}
 	noComments := make([]github.IssueComment, 0)
 	for _, issue := range gIssues {
 		value := comments[*issue.URL]
@@ -212,45 +241,108 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 	return iss
 }
 
-func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
-	oldValue gorlim.Issue, newValue gorlim.Issue) error {
-	// TBD: Handle comments
+func UpdateIssue(owner string, repo string, client *http.Client, date time.Time, oldValue, newValue gorlim.Issue) error {
+	// TBD: should we handle Response or errors are enough?
 	// TBD: Creation of new milestones
 	// TBD: support for creation of new issues (now only editing works)
-
 	fmt.Println("github_gate.SetIssues")
 
-	/*gh := github.NewClient(client)
+	gh := github.NewClient(client)
 	issueService := gh.Issues
 
-	for _, issue := range issues {
-		title := issue.Title
-		body := issue.Description
-		assignee := issue.Assignee
-		labels := issue.Labels
-		var state string
-		if issue.Opened {
-			state = "open"
-		} else {
-		 	state = "closed"
-		}
-		request := github.IssueRequest {
-			Title: &title,
-			Body: &body,
-			Assignee: &assignee,
-			State: &state,
-			Labels: labels,
-			Milestone: nil,
-		}
-		milestone, err := strconv.Atoi(issue.Milestone)
-		if err == nil {
-			request.Milestone = &milestone
-		}
-		fmt.Printf("Edit request for issue send to github.issues %d\n", issue.Id)
-		_, _, err = issueService.Edit(owner, repo, issue.Id, &request)
+	gIssue, _, _ := issueService.Get(owner, repo, newValue.Id)
+	gComments := getGithubIssueComments(owner, repo, gh, newValue.Id)
+	issue := convertGithubIssue(*gIssue, gComments)
+	if !issue.Equals(oldValue) {
+        fmt.Println(len(gComments))
+        fmt.Println(newValue.Id)
+        fmt.Println(len(oldValue.Comments))
+		return errors.New("Github issue is different from origin")
+	}
+	// Update main fields
+	request := github.IssueRequest {}
+	if oldValue.Title != newValue.Title {
+		request.Title = &newValue.Title
+	}
+	if oldValue.Description != newValue.Description {
+		request.Body = &newValue.Description
+	}
+	if oldValue.Assignee != newValue.Assignee {
+		request.Assignee = &newValue.Assignee	
+	}
+	if oldValue.Milestone != newValue.Milestone {
+		milestone, err := strconv.Atoi(newValue.Milestone)	
 		if err != nil {
 			panic(err)
 		}
-	}*/
+		request.Milestone = &milestone
+	}	
+	if oldValue.Opened != newValue.Opened {
+		state := "closed"
+		request.State = &state
+	}
+	request.Labels = newValue.Labels
+	fmt.Printf("Edit request for issue send to github.issues %d\n", issue.Id)
+	_, _, err := issueService.Edit(owner, repo, newValue.Id, &request)
+	if err != nil {
+		return err
+	}
+	removeComment := func (i int) (err error) {
+		comment := gComments[i]
+		_, err = issueService.DeleteComment(owner, repo, *comment.ID)
+		return
+	}
+	editComment := func (i int, text string) (err error) {
+		comment := gComments[i]
+		comment.Body = &text
+		_, _, err = issueService.EditComment(owner, repo, *comment.ID, &comment)
+		return
+	}
+	addComment := func(text string) (err error) {
+		comment := github.IssueComment { Body: &text }
+		_, _, err = issueService.CreateComment(owner, repo, newValue.Id, &comment)
+		return
+	}
+	// Update comments
+	oldCommentsCount := len(oldValue.Comments)
+	newCommentsCount := len(newValue.Comments)
+	i := 0
+	ni := 0
+	for ; (i < oldCommentsCount) && (ni < newCommentsCount); i++ {
+		oldComment := oldValue.Comments[i]
+		newComment := newValue.Comments[ni]
+		if oldComment.Author != newComment.Author { // Old comment was removed
+			if oldComment.Author != owner {
+				return errors.New("Cannot remove others comments")
+			}
+			if err := removeComment(i); err != nil {
+				return err
+			}
+			continue
+		}
+		if oldComment.Text != newComment.Text {
+			if err := editComment(i, newComment.Text); err != nil {
+				return err
+			}
+		}
+		ni++
+	}
+	if i != oldCommentsCount {
+		// Remove comments
+		for ; i < oldCommentsCount; i++ {
+			if err:= removeComment(i); err != nil {
+				return err
+			}
+		}
+
+	} else if ni != newCommentsCount {
+		for ; ni < newCommentsCount; ni++ {
+			newComment := newValue.Comments[ni]
+			if err := addComment(newComment.Text); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

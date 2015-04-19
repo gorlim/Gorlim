@@ -394,6 +394,9 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 		}
 		comment = comment + text[i]
 	}
+	if comment != "" {
+		issue.Comments = append(issue.Comments, Comment{Text: comment})
+	}
 	return true
 }
 
