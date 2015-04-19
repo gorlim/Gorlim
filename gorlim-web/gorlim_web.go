@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
-    "github.com/gorlim/Gorlim/gorlim"
+ 	"github.com/gorlim/Gorlim/gorlim"
 	"github.com/gorlim/Gorlim/gorlim_github"
 	"github.com/gorlim/Gorlim/storage"
 	"io/ioutil"
