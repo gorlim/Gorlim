@@ -1,7 +1,9 @@
 package gorlim
 
-import "time"
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type IssuesUpdate struct {
 	Uri    string
@@ -32,21 +34,21 @@ func (sm *SyncManager) InitGitRepoFromIssues(uri string, emptyGitRepo IssueRepos
 		issue1 := issue
 		issue1.Comments = []Comment{}
 		issue1.Opened = true
-		repo.Commit("webimport Opened issue: " + issue.Title + " " + issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
+		repo.Commit("webimport Opened issue: "+issue.Title+" "+issue.Description, []Issue{issue1}, *issue.At, &issue.Creator)
 		for i := 0; i < len(issue.Comments); i++ {
-			issue1.Comments = issue.Comments[0 : i + 1] 
+			issue1.Comments = issue.Comments[0 : i+1]
 			repo.Commit(fmt.Sprintf("webimport: #%v", issue.Comments[i].Text), []Issue{issue1}, *issue.Comments[i].At, &issue.Comments[i].Author)
 		}
 		if issue.Opened == false {
 			if issue.Assignee == "" {
-				repo.Commit("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, nil)
+				repo.Commit("webimport Closed issue: "+issue.Title, []Issue{issue}, *issue.ClosedAt, nil)
 			} else {
-				repo.Commit("webimport Closed issue: " + issue.Title, []Issue{issue}, *issue.ClosedAt, &issue.Assignee)
+				repo.Commit("webimport Closed issue: "+issue.Title, []Issue{issue}, *issue.ClosedAt, &issue.Assignee)
 			}
 		}
 
-        issueImportEndTime := time.Now()
-        timePassed := issueImportEndTime.Sub(issueImportStartTime)
+		issueImportEndTime := time.Now()
+		timePassed := issueImportEndTime.Sub(issueImportStartTime)
 		fmt.Printf("Finished import of issue %d ms %d\n", issue.Id, int64(timePassed/time.Millisecond))
 	}
 	importEndTime := time.Now()

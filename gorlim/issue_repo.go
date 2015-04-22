@@ -1,29 +1,27 @@
 package gorlim
 
-import "github.com/libgit2/git2go"
-import "strconv"
-import "os"
-
-import "bytes"
-import "strings"
-import "bufio"
-
-import "os/exec"
-import "time"
-import "sync"
-//import "path/filepath"
-
-import "fmt"
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"github.com/libgit2/git2go"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
 
 // threshold for number of commits to repo
 // before issuing next "garbage collection"
 const gcThreshold = 2048
 
 type issueRepository struct {
-	path string
-	gcCounter int
-	repo *git.Repository
-	mutex *sync.Mutex
+	path        string
+	gcCounter   int
+	repo        *git.Repository
+	mutex       *sync.Mutex
 	prePushHook PrePushHook
 }
 
@@ -40,23 +38,23 @@ func init() {
 			for prePush := range listener.GetPrePushChannel() {
 				irepo := repoMap[prePush.RepoPath]
 				if irepo.prePushHook == nil {
-					replyChannel <- RepoPrePushReply { Status : true }
+					replyChannel <- RepoPrePushReply{Status: true}
 					continue
 				}
 				irepo.establishExclusiveRepoConnection()
 				oid, err := git.NewOid(prePush.Sha)
 				if err != nil {
 					irepo.closeExclusiveRepoConnection()
-					replyChannel <- RepoPrePushReply { Status: false, Err : "invalid commit SHA" }
+					replyChannel <- RepoPrePushReply{Status: false, Err: "invalid commit SHA"}
 					continue
 				}
 				head, _ := irepo.repo.Head()
 				diff := irepo.diff(head.Target(), oid)
 				irepo.closeExclusiveRepoConnection()
 				if err = irepo.prePushHook(diff); err != nil {
-					replyChannel <- RepoPrePushReply { Status: false, Err : err.Error() }
+					replyChannel <- RepoPrePushReply{Status: false, Err: err.Error()}
 				} else {
-					replyChannel <- RepoPrePushReply { Status : true }
+					replyChannel <- RepoPrePushReply{Status: true}
 				}
 			}
 		}
@@ -64,15 +62,15 @@ func init() {
 }
 
 func NewGitRepo(repoPath string) IssueRepositoryInterface {
-  repo := issueRepository{}
-  repo.initializeNewRepo(repoPath)
-  return &repo
+	repo := issueRepository{}
+	repo.initializeNewRepo(repoPath)
+	return &repo
 }
 
 func CreateFromExistingGitRepo(repoPath string) IssueRepositoryInterface {
-  repo := issueRepository{}
-  repo.initRepoObject(repoPath)
-  return &repo
+	repo := issueRepository{}
+	repo.initRepoObject(repoPath)
+	return &repo
 }
 
 func (r *issueRepository) SetPrePushHook(pph PrePushHook) {
@@ -109,7 +107,7 @@ func (r *issueRepository) initializeNewRepo(repoPath string) {
 	pre, err := os.Create(r.path + "/.git/hooks/pre-receive")
 	if err != nil {
 		panic(err)
-	}	
+	}
 	defer pre.Close()
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
@@ -167,28 +165,46 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 		parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
 		return issue
 	}
-	modifiedIssuesMap := make(map[int]struct {Old Issue; New Issue})
+	modifiedIssuesMap := make(map[int]struct {
+		Old Issue
+		New Issue
+	})
 	var newIssues []Issue
 	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
 		switch dd.Status {
 		case git.DeltaModified:
 			oldIssue, newIssue := parseIssue(dd.OldFile), parseIssue(dd.NewFile)
-			modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, newIssue }
+			modifiedIssuesMap[oldIssue.Id] = struct {
+				Old Issue
+				New Issue
+			}{oldIssue, newIssue}
 		case git.DeltaAdded:
 			newIssue := parseIssue(dd.NewFile)
 			mod, ok := modifiedIssuesMap[newIssue.Id]
 			if ok {
-				modifiedIssuesMap[newIssue.Id] = struct {Old Issue; New Issue} { mod.Old, newIssue }
+				modifiedIssuesMap[newIssue.Id] = struct {
+					Old Issue
+					New Issue
+				}{mod.Old, newIssue}
 			} else {
-				modifiedIssuesMap[newIssue.Id] = struct {Old Issue; New Issue} { Issue{}, newIssue }
+				modifiedIssuesMap[newIssue.Id] = struct {
+					Old Issue
+					New Issue
+				}{Issue{}, newIssue}
 			}
 		case git.DeltaDeleted:
 			oldIssue := parseIssue(dd.OldFile)
 			mod, ok := modifiedIssuesMap[oldIssue.Id]
 			if ok {
-				modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, mod.New }
+				modifiedIssuesMap[oldIssue.Id] = struct {
+					Old Issue
+					New Issue
+				}{oldIssue, mod.New}
 			} else {
-				modifiedIssuesMap[oldIssue.Id] = struct {Old Issue; New Issue} { oldIssue, Issue{} }
+				modifiedIssuesMap[oldIssue.Id] = struct {
+					Old Issue
+					New Issue
+				}{oldIssue, Issue{}}
 			}
 		}
 		return nil, nil
@@ -204,13 +220,16 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 	}
 	fmt.Println("Following issues : ")
 	// return
-	modifiedIssues := make([]struct {Old Issue; New Issue}, len(modifiedIssuesMap), len(modifiedIssuesMap))
+	modifiedIssues := make([]struct {
+		Old Issue
+		New Issue
+	}, len(modifiedIssuesMap), len(modifiedIssuesMap))
 	index := 0
 	for _, m := range modifiedIssuesMap {
 		modifiedIssues[index] = m
 		index++
 	}
-	return CommitDiff { NewIssues : newIssues, ModifiedIssues: modifiedIssues}
+	return CommitDiff{NewIssues: newIssues, ModifiedIssues: modifiedIssues}
 }
 
 func setIgnoreDenyCurrentBranch(rpath string) {
@@ -238,8 +257,8 @@ func setIgnoreDenyCurrentBranch(rpath string) {
 }
 
 // TODO: rewrite this method to avoid parsing all issues
-func (r *issueRepository) GetIssue(id int) (Issue, bool) { 
-	issues, _ := r.GetIssues() 
+func (r *issueRepository) GetIssue(id int) (Issue, bool) {
+	issues, _ := r.GetIssues()
 	for _, issue := range issues {
 		if issue.Id == id {
 			return issue, true
@@ -348,12 +367,12 @@ func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
 		if strings.Contains(text[i], "Labels:") {
 			split := strings.Split(text[i], ":")
 			labels := strings.TrimSpace(split[1])
-			if (len(labels) > 0) {
+			if len(labels) > 0 {
 				split = strings.Split(labels, ",")
 				for _, label := range split {
 					issue.Labels = append(issue.Labels, strings.TrimSpace(label))
 				}
-			}	
+			}
 			i++
 			break
 		}
@@ -592,7 +611,7 @@ func (r *issueRepository) doGarbageCollection() {
 	// libgit2 API does not inlude explicit "gc" or "repack" command
 	// It (API) is too low-level, so we would need to implement our own repack algorithm
 	// Let's do this "hack" instead
-	_, err := exec.Command("git", "--git-dir=" + r.path + "/.git", "gc").CombinedOutput()
+	_, err := exec.Command("git", "--git-dir="+r.path+"/.git", "gc").CombinedOutput()
 	if err != nil {
 		panic(err)
 	}

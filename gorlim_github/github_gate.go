@@ -1,13 +1,13 @@
 package gorlim_github
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/go-github/github"
 	"github.com/gorlim/Gorlim/gorlim"
 	"net/http"
-	"time"
-	"errors"
 	"strconv"
+	"time"
 )
 
 var DEFAULT_DATE time.Time = time.Unix(0, 0)
@@ -110,7 +110,7 @@ func getGithubIssueComments(owner string, repo string, client *github.Client, is
 			panic(err)
 		}
 		comments = append(comments, pageComments...)
-	    fmt.Printf("Number of updated comments %d\n", len(comments))
+		fmt.Printf("Number of updated comments %d\n", len(comments))
 		clo.ListOptions.Page = resp.NextPage
 		if resp.NextPage == 0 {
 			break
@@ -221,11 +221,11 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 	}
 	iss := make([]gorlim.Issue, 0, len(gIssues))
 	var comments map[string][]github.IssueComment
-    if date == nil {
+	if date == nil {
 		comments = getGithubIssuesComments(owner, repo, gh)
 	} else {
 		comments = make(map[string][]github.IssueComment)
-		for _, issue  := range gIssues {
+		for _, issue := range gIssues {
 			comments[*issue.URL] = getGithubIssueComments(owner, repo, gh, *issue.Number)
 		}
 	}
@@ -254,13 +254,13 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 	gComments := getGithubIssueComments(owner, repo, gh, newValue.Id)
 	issue := convertGithubIssue(*gIssue, gComments)
 	if !issue.Equals(oldValue) {
-        fmt.Println(len(gComments))
-        fmt.Println(newValue.Id)
-        fmt.Println(len(oldValue.Comments))
+		fmt.Println(len(gComments))
+		fmt.Println(newValue.Id)
+		fmt.Println(len(oldValue.Comments))
 		return errors.New("Github issue is different from origin")
 	}
 	// Update main fields
-	request := github.IssueRequest {}
+	request := github.IssueRequest{}
 	if oldValue.Title != newValue.Title {
 		request.Title = &newValue.Title
 	}
@@ -268,15 +268,15 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 		request.Body = &newValue.Description
 	}
 	if oldValue.Assignee != newValue.Assignee {
-		request.Assignee = &newValue.Assignee	
+		request.Assignee = &newValue.Assignee
 	}
 	if oldValue.Milestone != newValue.Milestone {
-		milestone, err := strconv.Atoi(newValue.Milestone)	
+		milestone, err := strconv.Atoi(newValue.Milestone)
 		if err != nil {
 			panic(err)
 		}
 		request.Milestone = &milestone
-	}	
+	}
 	if oldValue.Opened != newValue.Opened {
 		state := "closed"
 		request.State = &state
@@ -287,19 +287,19 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 	if err != nil {
 		return err
 	}
-	removeComment := func (i int) (err error) {
+	removeComment := func(i int) (err error) {
 		comment := gComments[i]
 		_, err = issueService.DeleteComment(owner, repo, *comment.ID)
 		return
 	}
-	editComment := func (i int, text string) (err error) {
+	editComment := func(i int, text string) (err error) {
 		comment := gComments[i]
 		comment.Body = &text
 		_, _, err = issueService.EditComment(owner, repo, *comment.ID, &comment)
 		return
 	}
 	addComment := func(text string) (err error) {
-		comment := github.IssueComment { Body: &text }
+		comment := github.IssueComment{Body: &text}
 		_, _, err = issueService.CreateComment(owner, repo, newValue.Id, &comment)
 		return
 	}
@@ -330,7 +330,7 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 	if i != oldCommentsCount {
 		// Remove comments
 		for ; i < oldCommentsCount; i++ {
-			if err:= removeComment(i); err != nil {
+			if err := removeComment(i); err != nil {
 				return err
 			}
 		}

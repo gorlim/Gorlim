@@ -45,7 +45,7 @@ func (issue Issue) Equals(other Issue) bool {
 	}
 	if issue.PullRequest != other.PullRequest {
 		return false
-	}	
+	}
 	if len(issue.Labels) != len(other.Labels) {
 		return false
 	}
@@ -59,7 +59,7 @@ func (issue Issue) Equals(other Issue) bool {
 	}
 	for i, comment := range issue.Comments {
 		if other.Comments[i].Text != comment.Text ||
-		   other.Comments[i].Text != comment.Text {
+			other.Comments[i].Text != comment.Text {
 			return false
 		}
 	}
