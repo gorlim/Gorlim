@@ -22,6 +22,7 @@ import (
 const GH_SUFFIX = "/auth/github"
 const PROJECTS_SUFFIX = "/projects"
 const ADD_SUFFIX = "/add_project"
+const SSH_FORMAT = "command=\"$GOPATH/bin/gorlim_ssh %v\",no-port-forwarding,no-X11-forwarding,no-pty ssh-rsa\n%v\n"
 
 var db *storage.Storage
 
@@ -212,7 +213,7 @@ func initUser(code string, ch chan error) {
 			return
 		}
 		for _, key := range keys {
-			if _, err = f.WriteString((*key.Key) + "\n"); err != nil {
+			if _, err = fmt.Fprintf(f, SSH_FORMAT, login, (*key.Key)); err != nil {
 				ch <- err
 				return
 			}

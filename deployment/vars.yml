@@ -1,0 +1,10 @@
+---
+system_packages:
+        - git
+        - pkg-config
+        - cmake
+git_root: /git
+git_user: git
+gorlim_user: gorlim
+project: github.com/gorlim/Gorlim
+GOPATH: /home/{{ gorlim_user }}/go

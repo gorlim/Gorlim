@@ -1,0 +1,40 @@
+- 
+  hosts: all
+  sudo: true
+  vars_files:
+          - vars.yml
+  roles:
+          - joshualund.golang
+  environment:
+          GOPATH: "{{ GOPATH }}"
+          PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
+  tasks:
+        - name: Install ssh server and git 
+          apt: name={{ item }} state=installed #update-cache=yes
+          with_items: "{{ system_packages }}"
+
+        - name: Create gorlim user
+          user: name={{ gorlim_user }} home=/home/{{ gorlim_user }}
+
+        - name: Install godep
+          command: go get github.com/tools/godep creates={{ GOPATH }}/bin/godep
+
+        - name: Get source
+          command: go get -d {{ project }} creates={{ GOPATH }}/bin/{{ project }}
+  
+        - name: godep restore
+          command: "{{ GOPATH }}/bin/godep restore chdir={{ GOPATH }}/src/github.com/gorlim/Gorlim"
+
+        - name: libgit2
+          command: creates={{ GOPATH }}/pkg/*/github.com/libgit2/git2go.a chdir={{ GOPATH }}/src/github.com/libgit2/git2go {{ item }}
+          with_items:
+                  - git submodule update --init
+                  - make install
+
+        - name: Build all
+          command: go build {{ project }}/gorlim_ssh {{ project }}/gorlim_hooks {{ project }}
+
+        - name: Create git user
+          user: name={{ git_user }} home=/home/{{ git_user }}
+
+        

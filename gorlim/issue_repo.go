@@ -112,7 +112,7 @@ func (r *issueRepository) initializeNewRepo(repoPath string) {
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("read oldrev newrev refname\n")
-	pre.WriteString(os.Getenv("HOME") + "/pre_push_hook " + repoPath + " $oldrev $newrev\n")
+	pre.WriteString(os.Getenv("GOPATH") + "/bin/gorlim_hooks " + repoPath + " $oldrev $newrev\n")
 	// setup post-receive hook
 	/*post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
