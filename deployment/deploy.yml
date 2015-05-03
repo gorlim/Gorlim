@@ -3,6 +3,7 @@
   sudo: true
   vars_files:
           - vars.yml
+          - secret.yml
   roles:
           - joshualund.golang
   environment:
