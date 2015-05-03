@@ -20,8 +20,11 @@
           command: go get github.com/tools/godep creates={{ GOPATH }}/bin/godep
 
         - name: Get source
-          command: go get -d {{ project }} creates={{ GOPATH }}/bin/{{ project }}
+          command: go get -d {{ project }} creates={{ GOPATH }}/src/{{ project }}
   
+        - name: Update source
+          command: git pull chdir={{ GOPATH }}/src/{{ project }}
+
         - name: godep restore
           command: "{{ GOPATH }}/bin/godep restore chdir={{ GOPATH }}/src/github.com/gorlim/Gorlim"
 
