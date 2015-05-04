@@ -69,10 +69,15 @@ func init() {
 						replyChannel <- RepoEventReply{Status: true}
 					}
 				} else if (repoEvent.Event == PostPushEvent) {
-					irepo.createMoveCommitForNewIssues(irepo.pendingMoves)
-					replyChannel <- RepoEventReply{
-						Status: true,
-					    Message: "Ids were set for new issues - pull to get updated repo",
+					if len(irepo.pendingMoves) != 0 {
+						irepo.createMoveCommitForNewIssues(irepo.pendingMoves)
+						irepo.pendingMoves = nil
+						replyChannel <- RepoEventReply{
+							Status: true,
+					    	Message: "Ids were set for new issues - pull to get updated repo",
+						}
+					} else {
+						replyChannel <- RepoEventReply{ Status: true }
 					}
 				}
 				irepo.closeExclusiveRepoConnection()
