@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"errors"
 )
 
 // threshold for number of commits to repo
@@ -23,39 +24,58 @@ type issueRepository struct {
 	repo        *git.Repository
 	mutex       *sync.Mutex
 	prePushHook PrePushHook
+	pendingMoves map[string]int
 }
 
 var mutex = &sync.Mutex{}
 var id int = 0
-var listener PrePushListener = CreatePrePushListener()
+var listener RepoEventListener = CreateRepoEventListener()
 var repoMap map[string]*issueRepository = make(map[string]*issueRepository)
 
+type ExtendedCommitDiff struct {
+	CommitDiff
+	newIssuePathes []string
+}
+
 func init() {
-	// listen to pre-push events
+	// listen to repo events
 	go func() {
 		for {
-			replyChannel := listener.GetReplyChannel()
-			for prePush := range listener.GetPrePushChannel() {
-				irepo := repoMap[prePush.RepoPath]
+			for repoEvent := range listener.GetRepoEventChannel() {
+				replyChannel := repoEvent.Reply
+				irepo := repoMap[repoEvent.RepoPath]
 				if irepo.prePushHook == nil {
-					replyChannel <- RepoPrePushReply{Status: true}
+					replyChannel <- RepoEventReply{Status: true}
 					continue
 				}
 				irepo.establishExclusiveRepoConnection()
-				oid, err := git.NewOid(prePush.Sha)
+				oid, err := git.NewOid(repoEvent.Sha)
 				if err != nil {
 					irepo.closeExclusiveRepoConnection()
-					replyChannel <- RepoPrePushReply{Status: false, Err: "invalid commit SHA"}
+					replyChannel <- RepoEventReply{Status: false, Message: "invalid commit SHA"}
 					continue
 				}
-				head, _ := irepo.repo.Head()
-				diff := irepo.diff(head.Target(), oid)
-				irepo.closeExclusiveRepoConnection()
-				if err = irepo.prePushHook(diff); err != nil {
-					replyChannel <- RepoPrePushReply{Status: false, Err: err.Error()}
-				} else {
-					replyChannel <- RepoPrePushReply{Status: true}
+				if (repoEvent.Event == PrePushEvent) {
+					head, _ := irepo.repo.Head()
+					diff := irepo.diff(head.Target(), oid)
+					if err, ids := irepo.prePushHook(diff.CommitDiff); err != nil {
+						replyChannel <- RepoEventReply{Status: false, Message: err.Error()}
+					} else {
+						move := make(map[string]int)
+						for i := 0; i < len(diff.newIssuePathes); i++ {
+							move[diff.newIssuePathes[i]] = ids[i]
+						}
+						irepo.pendingMoves = move
+						replyChannel <- RepoEventReply{Status: true}
+					}
+				} else if (repoEvent.Event == PostPushEvent) {
+					irepo.createMoveCommitForNewIssues(irepo.pendingMoves)
+					replyChannel <- RepoEventReply{
+						Status: true,
+					    Message: "Ids were set for new issues - pull to get updated repo",
+					}
 				}
+				irepo.closeExclusiveRepoConnection()
 			}
 		}
 	}()
@@ -112,16 +132,17 @@ func (r *issueRepository) initializeNewRepo(repoPath string) {
 	pre.Chmod(0777)
 	pre.WriteString("#!/bin/sh\n")
 	pre.WriteString("read oldrev newrev refname\n")
-	pre.WriteString(os.Getenv("GOPATH") + "/bin/gorlim_hooks " + repoPath + " $oldrev $newrev\n")
+	pre.WriteString(os.Getenv("GOPATH") + "/gorlim_hook pre_push " + repoPath + " $oldrev $newrev\n")
 	// setup post-receive hook
-	/*post, err := os.Create(r.path + "/.git/hooks/post-receive")
+	post, err := os.Create(r.path + "/.git/hooks/post-receive")
 	if err != nil {
 		panic(err)
 	}
 	defer post.Close()
 	post.Chmod(0777)
 	post.WriteString("#!/bin/sh\n")
-	post.WriteString("echo " + strconv.Itoa(r.id) + " >" + getPushPipeName())*/
+	post.WriteString("read oldrev newrev refname\n")
+	post.WriteString(os.Getenv("GOPATH") + "/gorlim_hook post_push " + repoPath + " $oldrev $newrev\n")
 	return
 }
 
@@ -131,7 +152,7 @@ func blobToIssue(blob []byte) []string {
 	return strings.Split(str, "\n")
 }
 
-func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
+func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) ExtendedCommitDiff {
 	repo := r.repo
 
 	// find commits
@@ -158,42 +179,52 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 	if err != nil {
 		panic(err)
 	}
-	parseIssue := func(file git.DiffFile) Issue {
+	parseIssue := func(file git.DiffFile) (issue Issue, isNew bool) {
 		blob, _ := repo.LookupBlob(file.Oid)
-		issue := Issue{}
+		issue = Issue{}
+		if isNew = isNewIssueRepoPath(file.Path); !isNew {
+			issue.Id, _ = parseIssueIdFromRepoPath(file.Path)
+		}
 		parseIssuePropertiesFromRepoPath(file.Path, &issue)
 		parseIssuePropertiesFromText(blobToIssue(blob.Contents()), &issue)
-		return issue
+		return
 	}
 	modifiedIssuesMap := make(map[int]struct {
 		Old Issue
 		New Issue
 	})
 	var newIssues []Issue
+	var newIssuePathes []string
 	callback := func(dd git.DiffDelta, f float64) (git.DiffForEachHunkCallback, error) {
 		switch dd.Status {
 		case git.DeltaModified:
-			oldIssue, newIssue := parseIssue(dd.OldFile), parseIssue(dd.NewFile)
+			oldIssue, _ := parseIssue(dd.OldFile)
+			newIssue, _ := parseIssue(dd.NewFile)
 			modifiedIssuesMap[oldIssue.Id] = struct {
 				Old Issue
 				New Issue
 			}{oldIssue, newIssue}
 		case git.DeltaAdded:
-			newIssue := parseIssue(dd.NewFile)
+			newIssue, isNew := parseIssue(dd.NewFile)
 			mod, ok := modifiedIssuesMap[newIssue.Id]
-			if ok {
-				modifiedIssuesMap[newIssue.Id] = struct {
-					Old Issue
-					New Issue
-				}{mod.Old, newIssue}
+			if isNew {
+				newIssues = append(newIssues, newIssue)
+				newIssuePathes = append(newIssuePathes, dd.NewFile.Path)
 			} else {
-				modifiedIssuesMap[newIssue.Id] = struct {
-					Old Issue
-					New Issue
-				}{Issue{}, newIssue}
+				if ok {
+					modifiedIssuesMap[newIssue.Id] = struct {
+						Old Issue
+						New Issue
+					}{mod.Old, newIssue}
+				} else {
+					modifiedIssuesMap[newIssue.Id] = struct {
+						Old Issue
+						New Issue
+					}{Issue{}, newIssue}
+				}
 			}
 		case git.DeltaDeleted:
-			oldIssue := parseIssue(dd.OldFile)
+			oldIssue, _ := parseIssue(dd.OldFile)
 			mod, ok := modifiedIssuesMap[oldIssue.Id]
 			if ok {
 				modifiedIssuesMap[oldIssue.Id] = struct {
@@ -212,13 +243,6 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 	if err = diff.ForEach(callback, git.DiffDetailFiles); err != nil {
 		panic(err)
 	}
-	// temporary debug print
-	fmt.Println("Following issues modified: ")
-	for _, m := range modifiedIssuesMap {
-		fmt.Println(issueToText(m.Old))
-		fmt.Println(issueToText(m.New))
-	}
-	fmt.Println("Following issues : ")
 	// return
 	modifiedIssues := make([]struct {
 		Old Issue
@@ -229,7 +253,13 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) CommitDiff {
 		modifiedIssues[index] = m
 		index++
 	}
-	return CommitDiff{NewIssues: newIssues, ModifiedIssues: modifiedIssues}
+	return ExtendedCommitDiff{
+		CommitDiff : CommitDiff {
+			NewIssues: newIssues,
+			ModifiedIssues: modifiedIssues,
+		},
+		newIssuePathes: newIssuePathes,
+	}
 }
 
 func setIgnoreDenyCurrentBranch(rpath string) {
@@ -284,7 +314,8 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 	for i := 0; i < int(issuesCount); i++ {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
-		issue := Issue{}
+		id, _ := parseIssueIdFromRepoPath(path)
+		issue := Issue{ Id: id }
 		parseIssuePropertiesFromRepoPath(path, &issue)
 		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
@@ -312,6 +343,26 @@ func readTextFile(file *os.File) []string {
 
 const delimiter string = "----------------------------------"
 
+func isNewIssueRepoPath(path string) bool {
+	split := strings.Split(path, "/")
+	last := split[len(split) - 1]
+	return strings.HasPrefix(last, "new_")
+}
+
+func parseIssueIdFromRepoPath(path string) (int, error) {
+	split := strings.Split(path, "/")
+	last := split[len(split) - 1]
+	if last[0] == '#' {
+		id, err := strconv.Atoi(last[1:])
+		if err != nil {
+			return -1, err
+		}
+		return id, nil
+	} else {
+		return -1, errors.New("Wrong issue id: " + last)
+	}
+}
+
 func parseIssuePropertiesFromRepoPath(path string, issue *Issue) {
 	split := strings.Split(path, "/")
 	issue.Opened = split[0] == "open"
@@ -323,15 +374,6 @@ func parseIssuePropertiesFromRepoPath(path string, issue *Issue) {
 	if split[splitIndex][0] == '@' {
 		issue.Assignee = split[splitIndex][1:]
 		splitIndex++
-	}
-	if split[splitIndex][0] == '#' {
-		id, err := strconv.Atoi(split[splitIndex][1:])
-		if err != nil {
-			panic("Invalid issue id " + split[splitIndex][1:])
-		}
-		issue.Id = id
-	} else {
-		panic("Wrong issue path" + path)
 	}
 }
 
@@ -502,6 +544,55 @@ func (r *issueRepository) closeExclusiveRepoConnection() {
 	r.repo.Free()
 	r.repo = nil
 	r.unlock()
+}
+
+func (r *issueRepository) createMoveCommitForNewIssues(moves map[string]int) {
+	repo := r.repo
+	idx, err := repo.Index()
+	if err != nil {
+		panic(err)
+	}
+	for oldPath, id := range(moves) {
+		issue := Issue { Id: id	}
+		parseIssuePropertiesFromRepoPath(oldPath, &issue)
+		newPath := getIssueDir(issue) + getIssueFileName(issue)
+		err := os.Rename(r.path + "/" + oldPath, r.path + "/" + newPath)
+		if err != nil {
+			panic(err)
+		}
+		// update index
+		if err := idx.RemoveByPath(oldPath); err != nil {
+			panic(err)
+		}
+		err = idx.AddByPath(newPath)
+		if err != nil {
+			panic(err)
+		}
+	}
+	// write index to filesystem
+	treeId, err := idx.WriteTree()
+	if err != nil {
+		panic(err)
+	}
+	if err = idx.Write(); err != nil {
+		panic(err)
+	}
+	tree, err := repo.LookupTree(treeId)
+	if err != nil {
+		panic(err)	
+	}		
+	// get head commit
+	head, _ := repo.Head()
+	headCommit, err := repo.LookupCommit(head.Target())
+	if err != nil {
+		panic(err)
+	}
+	// do move commit
+	signature := &git.Signature{Name: "gorlim", Email: "none", When: time.Now()}
+	_, err = repo.CreateCommit("refs/heads/master", signature, signature, "rename new issues", tree, headCommit)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (r *issueRepository) Commit(message string, issues []Issue, tm time.Time, updateAuthor *string) {

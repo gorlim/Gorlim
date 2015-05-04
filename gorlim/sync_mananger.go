@@ -65,18 +65,26 @@ func (sm *SyncManager) EstablishSync(uri string, repo IssueRepositoryInterface) 
 }
 
 func (sm *SyncManager) subscribeToPrePushEvent(repo IssueRepositoryInterface, webUri string) {
-	// TODO: force sync
+	// TODO: force sync with web issues at that point
 	repo.SetPrePushHook(
-		func(commitDiff CommitDiff) error {
+		func(commitDiff CommitDiff) (error, []int) {
+			var ids []int
 			for _, mod := range commitDiff.ModifiedIssues {
 				err := sm.webIssues.UpdateIssue(webUri, mod.Old, mod.New)
 				if err != nil {
-					panic(err) // TEMP
-					return err
+					panic(err) // TBD
+					return err, ids
 				}
 			}
-			// TODO: new Issues
-			return nil
+			for _, nIssue := range commitDiff.NewIssues {
+				id, err := sm.webIssues.CreateIssue(webUri, nIssue)
+				ids = append(ids, id)
+				if err != nil {
+					panic(err) // TBD
+					return err, ids
+				}
+			}
+			return nil, ids
 		})
 }
 

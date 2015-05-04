@@ -241,12 +241,10 @@ func GetIssues(owner string, repo string, client *http.Client, date *time.Time) 
 	return iss
 }
 
-func UpdateIssue(owner string, repo string, client *http.Client, date time.Time, oldValue, newValue gorlim.Issue) error {
+func UpdateIssue(owner string, repo string, client *http.Client, oldValue, newValue gorlim.Issue) error {
 	// TBD: should we handle Response or errors are enough?
+	// TBD: Improved checks
 	// TBD: Creation of new milestones
-	// TBD: support for creation of new issues (now only editing works)
-	fmt.Println("github_gate.SetIssues")
-
 	gh := github.NewClient(client)
 	issueService := gh.Issues
 
@@ -254,9 +252,6 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 	gComments := getGithubIssueComments(owner, repo, gh, newValue.Id)
 	issue := convertGithubIssue(*gIssue, gComments)
 	if !issue.Equals(oldValue) {
-		fmt.Println(len(gComments))
-		fmt.Println(newValue.Id)
-		fmt.Println(len(oldValue.Comments))
 		return errors.New("Github issue is different from origin")
 	}
 	// Update main fields
@@ -345,4 +340,43 @@ func UpdateIssue(owner string, repo string, client *http.Client, date time.Time,
 	}
 
 	return nil
+}
+
+func CreateIssue(owner string, repo string, client *http.Client, issue gorlim.Issue) (id int, err error) {
+	gh := github.NewClient(client)
+	issueService := gh.Issues
+	request := github.IssueRequest{}
+	request.Title = &issue.Title
+	request.Body = &issue.Description
+	request.Assignee = &issue.Assignee
+	if issue.Milestone != "" {
+		milestone, err := strconv.Atoi(issue.Milestone)
+		if err != nil {
+			panic(err)
+		}
+		request.Milestone = &milestone
+	}
+	var state string
+	if issue.Opened {
+		state = "opened"
+	} else {
+		state = "closed"
+	}
+	request.State = &state
+	request.Labels = issue.Labels
+	gIssue, _, err := issueService.Create(owner, repo, &request)
+	if err != nil {
+		return -1, err
+	}
+    id = *gIssue.Number
+    fmt.Printf("Created issued %d\n", id)
+    for _, comment := range(issue.Comments) {
+    	gComment := github.IssueComment{Body: &comment.Text}
+		_, _, err = issueService.CreateComment(owner, repo, id, &gComment)	
+		if err != nil {
+			return -1, err
+		}
+    }
+    // TBD - comments
+    return id, nil
 }

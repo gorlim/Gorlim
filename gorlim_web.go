@@ -231,6 +231,18 @@ type GithubWebIssuesInterface struct {
 	secretId string
 }
 
+func (gwi *GithubWebIssuesInterface) CreateIssue(uri string, issue gorlim.Issue) (int, error) {
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	access_token, err := (*db).GetGithubAuth(owner)
+	if err != nil {
+		panic(err)
+	}
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: access_token},
+	}
+	return gorlim_github.CreateIssue(owner, repo, t.Client(), issue)
+}
+
 func (gwi *GithubWebIssuesInterface) UpdateIssue(uri string, oldValue gorlim.Issue, newValue gorlim.Issue) error {
 	owner, repo := gwi.uriToOwnerRepoPair(uri)
 	access_token, err := (*db).GetGithubAuth(owner)
@@ -240,7 +252,7 @@ func (gwi *GithubWebIssuesInterface) UpdateIssue(uri string, oldValue gorlim.Iss
 	t := &oauth.Transport{
 		Token: &oauth.Token{AccessToken: access_token},
 	}
-	return gorlim_github.UpdateIssue(owner, repo, t.Client(), time.Now(), oldValue, newValue)
+	return gorlim_github.UpdateIssue(owner, repo, t.Client(), oldValue, newValue)
 }
 
 func (gwi *GithubWebIssuesInterface) GetIssues(uri string, date *time.Time) []gorlim.Issue {
@@ -286,7 +298,6 @@ func getRepoPath(repo string) string {
 func createOurRepo(myType, user, repoName string) {
 	key := user + "/" + repoName
 	path := getRepoPath(key)
-	fmt.Println(path)
 	repo := gorlim.NewGitRepo(path)
 	syncManager.InitGitRepoFromIssues(key, repo)
 	syncManager.EstablishSync(key, repo)

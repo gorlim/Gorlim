@@ -10,7 +10,7 @@ type CommitDiff struct {
 	}
 }
 
-type PrePushHook func(CommitDiff) error
+type PrePushHook func(CommitDiff) (error, []int)
 
 type IssueRepositoryInterface interface {
 	GetIssue(id int) (Issue, bool)
