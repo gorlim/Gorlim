@@ -8,14 +8,12 @@
           - joshualund.golang
   environment:
           GOPATH: "{{ GOPATH }}"
+          GOROOT: "/usr/local/go"
           PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
   tasks:
         - name: Install ssh server and git 
           apt: name={{ item }} state=installed #update-cache=yes
           with_items: "{{ system_packages }}"
-
-        - name: Create gorlim user
-          user: name={{ gorlim_user }} home=/home/{{ gorlim_user }}
 
         - name: Install godep
           command: go get github.com/tools/godep creates={{ GOPATH }}/bin/godep
@@ -36,9 +34,15 @@
                   - make install
 
         - name: Build all
-          command: go build {{ project }}/gorlim_ssh {{ project }}/gorlim_hooks {{ project }}
+          command: go install {{ project }}/gorlim_ssh {{ project }}/gorlim_hooks {{ project }}/gorlim_web
 
         - name: Create git user
           user: name={{ git_user }} home=/home/{{ git_user }}
 
-        
+        - name: Kill server
+          command: pkill -f gorlim_web
+          ignore_errors: true
+
+        - name: Start Go webserver
+          command: nohup {{ GOPATH }}/bin/gorlim_web -github-client {{ github_client_id }} -github-secret {{ github_client_secret }} -static-dir {{ GOPATH }}/src/{{ project }}/gotlim_web/static -authorized-keys /home/{{ git_user }}/.ssh/authorized_keys
+                
