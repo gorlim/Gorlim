@@ -8,3 +8,4 @@ git_root: /git
 git_user: git
 project: github.com/gorlim/Gorlim
 GOPATH: /go
+gorlim_web_pid: /tmp/gorlim_web.pid

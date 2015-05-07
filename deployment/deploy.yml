@@ -43,6 +43,9 @@
           command: pkill -f gorlim_web
           ignore_errors: true
 
-        - name: Start Go webserver
-          command: nohup {{ GOPATH }}/bin/gorlim_web -github-client {{ github_client_id }} -github-secret {{ github_client_secret }} -static-dir {{ GOPATH }}/src/{{ project }}/gotlim_web/static -authorized-keys /home/{{ git_user }}/.ssh/authorized_keys
+        - name: Add Go webserver service
+          template: src=templates/gorlim_web.sh dest=/etc/init.d/gorlim_web mode=0751
+
+        - name: Start Go webserver service
+          service: name=gorlim_web state=restarted
                 
