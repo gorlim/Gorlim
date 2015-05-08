@@ -2,7 +2,7 @@
 
 SERVICE_NAME=gorlim_web
 DAEMON={{ GOPATH }}/bin/gorlim_web
-DAEMON_OPTS="-github-client {{ github_client_id }} -github-secret {{ github_client_secret }} -static-dir {{ GOPATH }}/src/{{ project }}/gotlim_web/static -authorized-keys /home/{{ git_user }}/.ssh/authorized_keys"
+DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ GOPATH }}/src/{{ project }}/gorlim_web/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys"
 PIDFILE={{ gorlim_web_pid }}
 
 if [ ! -x $DAEMON ]; then
@@ -28,7 +28,7 @@ stop_service() {
   echo -n " * Stopping $SERVICE_NAME... "
   PID=`cat $PIDFILE`
   if [ -f $PIDFILE ]; then
-      kill -HUP $PID
+      kill -9 $PID
       printf "%s\n" "Ok"
       rm -f $PIDFILE
   else
