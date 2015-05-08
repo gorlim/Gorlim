@@ -4,44 +4,26 @@
   vars_files:
           - vars.yml
           - secret.yml
-  roles:
-          - joshualund.golang
-  environment:
-          GOPATH: "{{ GOPATH }}"
-          GOROOT: "/usr/local/go"
-          PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
   tasks:
         - name: Install ssh server and git 
           apt: name={{ item }} state=installed #update-cache=yes
           with_items: "{{ system_packages }}"
 
-        - name: Install godep
-          command: go get github.com/tools/godep creates={{ GOPATH }}/bin/godep
+        - name: Create directory
+          file: path={{ bin }}/static state=directory
 
-        - name: Get source
-          command: go get -d {{ project }} creates={{ GOPATH }}/src/{{ project }}
-  
-        - name: Update source
-          command: git pull chdir={{ GOPATH }}/src/{{ project }}
-
-        - name: godep restore
-          command: "{{ GOPATH }}/bin/godep restore chdir={{ GOPATH }}/src/github.com/gorlim/Gorlim"
-
-        - name: libgit2
-          command: creates={{ GOPATH }}/pkg/*/github.com/libgit2/git2go.a chdir={{ GOPATH }}/src/github.com/libgit2/git2go {{ item }}
+        - name: Copy executable files
+          copy: src={{ lookup('env', 'GOPATH') }}/bin/{{ item }} dest={{ bin }} mode=755
           with_items:
-                  - git submodule update --init
-                  - make install
+                  - gorlim_web
+                  - gorlim_ssh
+                  - gorlim_hooks
 
-        - name: Build all
-          command: go install {{ project }}/gorlim_ssh {{ project }}/gorlim_hooks {{ project }}/gorlim_web
+        - name: Copy static
+          synchronize: src={{ lookup('env', 'GOPATH') }}/src/{{ project }}/gorlim_web/static dest={{ bin }}
 
         - name: Create git user
           user: name={{ git_user }} home=/home/{{ git_user }}
-
-        - name: Kill server
-          command: pkill -f gorlim_web
-          ignore_errors: true
 
         - name: Add Go webserver service
           template: src=templates/gorlim_web.sh dest=/etc/init.d/gorlim_web mode=0751

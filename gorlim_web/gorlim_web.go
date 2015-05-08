@@ -36,13 +36,13 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*staticDir)))
 	http.HandleFunc(GH_SUFFIX, githubAuthHandler)
 	var err error
-	// go to listen and serve loop
-	if err = http.ListenAndServe(":80", nil); err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
 	db, err = storage.Create(*dbFile)
 	if err != nil {
 		panic(err)
+	}
+	// go to listen and serve loop
+	if err = http.ListenAndServe(":80", nil); err != nil {
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
 

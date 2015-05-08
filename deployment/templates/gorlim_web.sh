@@ -1,8 +1,8 @@
 #!/bin/sh
 
 SERVICE_NAME=gorlim_web
-DAEMON={{ GOPATH }}/bin/gorlim_web
-DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ GOPATH }}/src/{{ project }}/gorlim_web/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys"
+DAEMON={{ bin }}/gorlim_web
+DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ bin }}/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys"
 PIDFILE={{ gorlim_web_pid }}
 
 if [ ! -x $DAEMON ]; then
@@ -13,7 +13,8 @@ fi
 start_service() {
   echo -n " * Starting $SERVICE_NAME... "
 
-  PID=`$DAEMON $DAEMONOPTS > /dev/null 2>&1 & echo $!`
+  DATE=`date +%F-%R`
+  PID=`$DAEMON $DAEMONOPTS > /var/log/gorlim_web_$DATE.log 2>&1 & echo $!`
   #echo "Saving PID" $PID " to " $PIDFILE
   if [ -z $PID ]; then
     printf "%s\n" "Fail"

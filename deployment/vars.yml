@@ -1,11 +1,8 @@
 ---
 system_packages:
         - git
-        - mercurial
-        - pkg-config
-        - cmake
 git_root: /git
 git_user: git
 project: github.com/gorlim/Gorlim
-GOPATH: /go
+bin: /gorlim
 gorlim_web_pid: /tmp/gorlim_web.pid
