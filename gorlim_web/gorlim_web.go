@@ -30,6 +30,8 @@ var ghClient = flag.String("github-client", "", "GitHub Client Id for applicatio
 var ghSecret = flag.String("github-secret", "", "GitHub Secret Id for application")
 var staticDir = flag.String("static-dir", "", "Directory where all static files are")
 var authorizedKeys = flag.String("authorized-keys", "~/.ssh/authorized_keys", "~/.ssh/authorized_keys to store ssh keys")
+var sslKeyPath = flag.String("ssl-key-file", "", "Path to SSL key file")
+var sslCertPath = flag.String("ssl-cert-file", "", "Path to SSL Certificate file")
 
 func main() {
 	flag.Parse()
@@ -41,7 +43,8 @@ func main() {
 		panic(err)
 	}
 	// go to listen and serve loop
-	if err = http.ListenAndServe(":80", nil); err != nil {
+	go http.ListenAndServe(":80", http.RedirectHandler("https://gorlim.ga", http.StatusFound))
+	if err = http.ListenAndServeTLS(":443", *sslCertPath, *sslKeyPath, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }

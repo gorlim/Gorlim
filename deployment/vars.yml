@@ -6,3 +6,5 @@ git_user: git
 project: github.com/gorlim/Gorlim
 bin: /gorlim
 gorlim_web_pid: /tmp/gorlim_web.pid
+ssl_key_file: "{{ bin }}/ca.key"
+ssl_certificate_file: "{{ bin }}/ca.crt"

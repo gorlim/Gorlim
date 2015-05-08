@@ -2,7 +2,7 @@
 
 SERVICE_NAME=gorlim_web
 DAEMON={{ bin }}/gorlim_web
-DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ bin }}/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys"
+DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ bin }}/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys -ssl-key-file={{ ssl_key_file }} -ssl-cert-file={{ ssl_certificate_file }}"
 PIDFILE={{ gorlim_web_pid }}
 
 if [ ! -x $DAEMON ]; then

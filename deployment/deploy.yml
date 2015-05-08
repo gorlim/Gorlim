@@ -22,6 +22,12 @@
         - name: Copy static
           synchronize: src={{ lookup('env', 'GOPATH') }}/src/{{ project }}/gorlim_web/static dest={{ bin }}
 
+        - name: Copy SSL private key
+          copy: dest={{ ssl_key_file }} content="{{ ssl_key }}"
+
+        - name: Copy SSL certificate
+          copy: dest={{ ssl_certificate_file }} content="{{ ssl_certificate }}"
+
         - name: Create git user
           user: name={{ git_user }} home=/home/{{ git_user }}
 
