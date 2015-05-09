@@ -1,11 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
+
+var approved = map[string]string{
+	"git-upload-pack": "git-upload-pack",
+}
 
 func unescape(in []string) []string {
 	for i := range in {
@@ -20,14 +23,18 @@ func unescape(in []string) []string {
 }
 
 func main() {
-	// read in input from stdin
 	user := os.Args[0]
-	// send to socket
 	os.Setenv("GORLIM_USER", user)
 	cmd := os.Getenv("SSH_ORIGINAL_COMMAND")
-	fmt.Fprintf(os.Stderr, "original command: %v\nargs: %v\n", cmd, os.Args)
+
 	parts := unescape(strings.Fields(cmd))
+	if len(parts) == 0 {
+		return
+	}
 	head := parts[0]
+	if _, ok := approved[head]; !ok {
+		return
+	}
 	parts = parts[1:len(parts)]
 
 	child := exec.Command(head, parts...)
