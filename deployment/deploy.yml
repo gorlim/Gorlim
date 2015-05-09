@@ -9,8 +9,11 @@
           apt: name={{ item }} state=installed #update-cache=yes
           with_items: "{{ system_packages }}"
 
-        - name: Create directory
-          file: path={{ bin }}/static state=directory
+        - name: Create directories
+          file: path={{ item }} state=directory mode=777
+          with_items:
+                  - "{{ bin }}/static"
+                  - "{{ git_root }}"
 
         - name: Copy executable files
           copy: src={{ lookup('env', 'GOPATH') }}/bin/{{ item }} dest={{ bin }} mode=755
@@ -30,6 +33,9 @@
 
         - name: Create git user
           user: name={{ git_user }} home=/home/{{ git_user }}
+
+        - name: Check authorized_keys
+          file: path=/home/{{ git_user }}/.ssh/authorized_keys state=touch
 
         - name: Add Go webserver service
           template: src=templates/gorlim_web.sh dest=/etc/init.d/gorlim_web mode=0751

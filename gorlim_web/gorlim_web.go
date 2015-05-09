@@ -20,7 +20,7 @@ import (
 )
 
 const GH_SUFFIX = "/auth/github"
-const SSH_FORMAT = "command=\"$GOPATH/bin/gorlim_ssh %v\",no-port-forwarding,no-X11-forwarding,no-pty ssh-rsa\n%v\n"
+const SSH_FORMAT = "command=\"%v %v\",no-port-forwarding,no-X11-forwarding %v\n"
 
 var db *storage.Storage
 
@@ -32,6 +32,7 @@ var staticDir = flag.String("static-dir", "", "Directory where all static files 
 var authorizedKeys = flag.String("authorized-keys", "~/.ssh/authorized_keys", "~/.ssh/authorized_keys to store ssh keys")
 var sslKeyPath = flag.String("ssl-key-file", "", "Path to SSL key file")
 var sslCertPath = flag.String("ssl-cert-file", "", "Path to SSL Certificate file")
+var sshCommandPath = flag.String("ssh-command", "", "Path to SSH command")
 
 func main() {
 	flag.Parse()
@@ -120,7 +121,7 @@ func initUser(code string, ch chan error) {
 			return
 		}
 		for _, key := range keys {
-			if _, err = fmt.Fprintf(f, SSH_FORMAT, login, (*key.Key)); err != nil {
+			if _, err = fmt.Fprintf(f, SSH_FORMAT, *sshCommandPath, login, (*key.Key)); err != nil {
 				ch <- err
 				return
 			}
