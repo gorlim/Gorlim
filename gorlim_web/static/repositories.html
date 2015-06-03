@@ -26,61 +26,10 @@
   </head>
 
   <body>
-	  <div class="container">
-    	<!-- Button trigger modal -->
-  	  <button type="button" class="btn btn-success btn-lg" data-toggle="modal" data-target="#myModal"> 
-							<i class="fa fa-plus-circle fa-lg"></i> Import from GitHub:Issues
-  		</button>
-      <!-- Modal -->
-      <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-              <h4 class="modal-title" id="myModalLabel">Import from GitHub:Issues</h4>
-            </div>
-            <div class="modal-body">
-							<div class="alert alert-danger" role="alert" style="visibility: hidden" id="myError">
-							</div>
-							<div class="form-group">
-							  <input type="text" class="form-control" id="inputRepo" placeholder="user/repo">
-							</div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
-              <button type="button" class="btn btn-success" onclick="create(document.getElementById('inputRepo').value)">Create</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Modal -->
-      <div class="modal fade" id="myModal2" tabindex="-1" role="dialog" aria-labelledby="myModalLabel2" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-              <h4 class="modal-title" id="myModalLabel2">Import from GitHub:Issues</h4>
-            </div>
-            <div class="modal-body">
-										Read-only git repo:<div id="ro" class="btn-primary"></div> <br/>
-										Read-write git repo (via your github SSH keys):<div id="rw" class="btn-primary"></div> 
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-primary" data-dismiss="modal">Ok</button>
-            </div>
-          </div>
-        </div>
-      </div>
-			<h2>Imported GitHub:Issues:</h2>
-			<form>
-				<div class="input-prepend">
-				  <span class="add-on"><i class="fa-icon-search"></i></span>
-					<input class="span2 form-control" type="text" id="search_input" placeholder="Type to filter" onkeyup="filter()" autocomplete="off"/>
-				</div>
-			</form>
-    	<ul id="search_list" class="list-group">
-  	  </ul>
-	  </div>
+   	<div class="container">
+	<p> For GitHub repository named <b>&lt;user&gt;/&lt;project&gt;</b> 
+	use following command: <blockquote>git clone git@gorlim.ga:/git/&lt;user&gt;/&lt;project&gt;</blockquote></p>
+</div>
     <!-- Bootstrap core JavaScript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->

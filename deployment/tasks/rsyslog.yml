@@ -3,4 +3,4 @@
     copy: src=files/rsyslog.conf dest=/etc/rsyslog.d/99-gorlim.conf
 
   - name: Restart rsyslog
-    service: name=rsyslog state=reloaded
+    shell: service rsyslog force-reload
