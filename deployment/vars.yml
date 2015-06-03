@@ -5,6 +5,9 @@ git_root: /git
 git_user: git
 project: github.com/gorlim/Gorlim
 bin: /gorlim
+db: /gorlim/gorlim.db
 gorlim_web_pid: /tmp/gorlim_web.pid
+gorlim_github_pid: /tmp/gorlim_github.pid
 ssl_key_file: "{{ bin }}/ca.key"
 ssl_certificate_file: "{{ bin }}/ca.crt"
+github_port: 9999

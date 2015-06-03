@@ -1,9 +1,9 @@
 #!/bin/sh
 
-SERVICE_NAME=gorlim_web
-DAEMON={{ bin }}/gorlim_web
-DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -static-dir={{ bin }}/static -authorized-keys=/home/{{ git_user }}/.ssh/authorized_keys -ssl-key-file={{ ssl_key_file }} -ssl-cert-file={{ ssl_certificate_file }} -ssh-command={{ bin }}/gorlim_ssh -db={{ db }}"
-PIDFILE={{ gorlim_web_pid }}
+SERVICE_NAME=gorlim_github
+DAEMON={{ bin }}/gorlim_github
+DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -root={{ git_root }} -port={{ github_port }} -db={{ db }}"
+USER={{ git_user }}
 
 if [ ! -x $DAEMON ]; then
   echo "ERROR: Can't execute $DAEMON."
@@ -12,8 +12,8 @@ fi
 
 start_service() {
   echo -n " * Starting $SERVICE_NAME... "
- 
-  $DAEMON $DAEMONOPTS 2>&1 | logger -i -p local0.info -t $SERVICE_NAME & 
+
+  $DAEMON $DAEMONOPTS 2>&1 | logger -i -p local0.info -t $SERVICE_NAME &
   PID=$!
   echo "Saving PID" $PID " to " $PIDFILE
   if [ -z $PID ]; then

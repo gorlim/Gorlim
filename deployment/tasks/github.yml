@@ -1,0 +1,8 @@
+---
+        - name: Add Gorlim-Github service
+          template: src=templates/gorlim_github.sh dest=/etc/init.d/gorlim_github mode=0700 owner={{ git_user }}
+
+        - name: Start Gorlim-Github service
+          sudo_user: "{{ git_user }}"
+          service: name=gorlim_github state=restarted
+        

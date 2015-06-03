@@ -1,0 +1,16 @@
+---
+  - name: Copy static
+    synchronize: src={{ lookup('env', 'GOPATH') }}/src/{{ project }}/gorlim_web/static dest={{ bin }}
+  
+  - name: Copy SSL private key
+    copy: dest={{ ssl_key_file }} content="{{ ssl_key }}" owner="{{ git_user }}" mode=644
+  
+  - name: Copy SSL certificate
+    copy: dest={{ ssl_certificate_file }} content="{{ ssl_certificate }}" owner="{{ git_user }}" mode=644
+  
+  - name: Add Go webserver service
+    template: src=templates/gorlim_web.sh dest=/etc/init.d/gorlim_web mode=0711 owner={{ git_user }}
+  
+  - name: Start Go webserver service
+    service: name=gorlim_web state=restarted
+                  

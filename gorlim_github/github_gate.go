@@ -1,12 +1,15 @@
-package gorlim_github
+package main
 
 import (
+	"code.google.com/p/goauth2/oauth"
 	"errors"
 	"fmt"
 	"github.com/google/go-github/github"
 	"github.com/gorlim/Gorlim/gorlim"
+	"github.com/gorlim/Gorlim/storage"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -368,15 +371,81 @@ func CreateIssue(owner string, repo string, client *http.Client, issue gorlim.Is
 	if err != nil {
 		return -1, err
 	}
-    id = *gIssue.Number
-    fmt.Printf("Created issued %d\n", id)
-    for _, comment := range(issue.Comments) {
-    	gComment := github.IssueComment{Body: &comment.Text}
-		_, _, err = issueService.CreateComment(owner, repo, id, &gComment)	
+	id = *gIssue.Number
+	fmt.Printf("Created issued %d\n", id)
+	for _, comment := range issue.Comments {
+		gComment := github.IssueComment{Body: &comment.Text}
+		_, _, err = issueService.CreateComment(owner, repo, id, &gComment)
 		if err != nil {
 			return -1, err
 		}
-    }
-    // TBD - comments
-    return id, nil
+	}
+	// TBD - comments
+	return id, nil
+}
+
+type GithubWebIssuesInterface struct {
+	db       storage.Storage
+	clientId string
+	secretId string
+}
+
+func (gwi *GithubWebIssuesInterface) CreateIssue(uri string, issue gorlim.Issue) (int, error) {
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	access_token, err := gwi.db.GetGithubAuth(owner)
+	if err != nil {
+		panic(err)
+	}
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: access_token},
+	}
+	return CreateIssue(owner, repo, t.Client(), issue)
+}
+
+func (gwi *GithubWebIssuesInterface) UpdateIssue(uri string, oldValue gorlim.Issue, newValue gorlim.Issue) error {
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	access_token, err := gwi.db.GetGithubAuth(owner)
+	if err != nil {
+		panic(err)
+	}
+	t := &oauth.Transport{
+		Token: &oauth.Token{AccessToken: access_token},
+	}
+	return UpdateIssue(owner, repo, t.Client(), oldValue, newValue)
+}
+
+func (gwi *GithubWebIssuesInterface) GetIssues(uri string, date *time.Time) []gorlim.Issue {
+	t := &github.UnauthenticatedRateLimitedTransport{
+		ClientID:     gwi.clientId,
+		ClientSecret: gwi.secretId,
+	}
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	return GetIssues(owner, repo, t.Client(), date)
+}
+
+func (gwi *GithubWebIssuesInterface) CreateIssuesUpdateChannel(uri string) <-chan gorlim.IssuesUpdate {
+	fmt.Println("CreateIssuesUpdateChannel")
+	ch := make(chan gorlim.IssuesUpdate)
+	owner, repo := gwi.uriToOwnerRepoPair(uri)
+	ticker := time.NewTicker(time.Minute)
+	go func() {
+		date := time.Now()
+		for now := range ticker.C {
+			fmt.Println("Tick")
+			t := &github.UnauthenticatedRateLimitedTransport{
+				ClientID:     gwi.clientId,
+				ClientSecret: gwi.secretId,
+			}
+			issues := GetIssues(owner, repo, t.Client(), &date)
+			date = now
+			ch <- gorlim.IssuesUpdate{Uri: uri, Issues: issues}
+		}
+	}()
+	return ch
+}
+
+func (gwi *GithubWebIssuesInterface) uriToOwnerRepoPair(uri string) (string, string) {
+	owner := strings.Split(uri, "/")[0]
+	repo := strings.Split(uri, "/")[1]
+	return owner, repo
 }

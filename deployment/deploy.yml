@@ -9,37 +9,32 @@
           apt: name={{ item }} state=installed #update-cache=yes
           with_items: "{{ system_packages }}"
 
+        - name: Create git user
+          user: name={{ git_user }} home=/home/{{ git_user }}
+
         - name: Create directories
-          file: path={{ item }} state=directory mode=777
+          file: path={{ item }} state=directory mode=700 owner={{ git_user }}
           with_items:
                   - "{{ bin }}/static"
                   - "{{ git_root }}"
 
         - name: Copy executable files
-          copy: src={{ lookup('env', 'GOPATH') }}/bin/{{ item }} dest={{ bin }} mode=755
+          copy: src={{ lookup('env', 'GOPATH') }}/bin/{{ item }} dest={{ bin }} mode=755 owner={{ git_user }}
           with_items:
                   - gorlim_web
+                  - gorlim_github
                   - gorlim_ssh
                   - gorlim_hooks
 
-        - name: Copy static
-          synchronize: src={{ lookup('env', 'GOPATH') }}/src/{{ project }}/gorlim_web/static dest={{ bin }}
 
-        - name: Copy SSL private key
-          copy: dest={{ ssl_key_file }} content="{{ ssl_key }}"
-
-        - name: Copy SSL certificate
-          copy: dest={{ ssl_certificate_file }} content="{{ ssl_certificate }}"
-
-        - name: Create git user
-          user: name={{ git_user }} home=/home/{{ git_user }}
+        - name: Check .ssh
+          file: path=/home/{{ git_user }}/.ssh state=directory owner={{ git_user }} mode=700
 
         - name: Check authorized_keys
-          file: path=/home/{{ git_user }}/.ssh/authorized_keys state=touch
+          file: path=/home/{{ git_user }}/.ssh/authorized_keys state=touch owner={{ git_user }} mode=700
 
-        - name: Add Go webserver service
-          template: src=templates/gorlim_web.sh dest=/etc/init.d/gorlim_web mode=0751
+        - include: tasks/web.yml
 
-        - name: Start Go webserver service
-          service: name=gorlim_web state=restarted
-                
+        - include: tasks/github.yml
+
+        - include: tasks/rsyslog.yml

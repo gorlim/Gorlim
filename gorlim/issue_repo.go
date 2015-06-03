@@ -3,6 +3,7 @@ package gorlim
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/libgit2/git2go"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"errors"
 )
 
 // threshold for number of commits to repo
@@ -19,17 +19,16 @@ import (
 const gcThreshold = 2048
 
 type issueRepository struct {
-	path        string
-	gcCounter   int
-	repo        *git.Repository
-	mutex       *sync.Mutex
-	prePushHook PrePushHook
+	path         string
+	gcCounter    int
+	repo         *git.Repository
+	mutex        *sync.Mutex
+	prePushHook  PrePushHook
 	pendingMoves map[string]int
 }
 
 var mutex = &sync.Mutex{}
 var id int = 0
-var listener RepoEventListener = CreateRepoEventListener()
 var repoMap map[string]*issueRepository = make(map[string]*issueRepository)
 
 type ExtendedCommitDiff struct {
@@ -39,7 +38,7 @@ type ExtendedCommitDiff struct {
 
 func init() {
 	// listen to repo events
-	go func() {
+	/*	go func() {
 		for {
 			for repoEvent := range listener.GetRepoEventChannel() {
 				replyChannel := repoEvent.Reply
@@ -55,7 +54,7 @@ func init() {
 					replyChannel <- RepoEventReply{Status: false, Message: "invalid commit SHA"}
 					continue
 				}
-				if (repoEvent.Event == PrePushEvent) {
+				if repoEvent.Event == PrePushEvent {
 					head, _ := irepo.repo.Head()
 					diff := irepo.diff(head.Target(), oid)
 					if err, ids := irepo.prePushHook(diff.CommitDiff); err != nil {
@@ -68,22 +67,22 @@ func init() {
 						irepo.pendingMoves = move
 						replyChannel <- RepoEventReply{Status: true}
 					}
-				} else if (repoEvent.Event == PostPushEvent) {
+				} else if repoEvent.Event == PostPushEvent {
 					if len(irepo.pendingMoves) != 0 {
 						irepo.createMoveCommitForNewIssues(irepo.pendingMoves)
 						irepo.pendingMoves = nil
 						replyChannel <- RepoEventReply{
-							Status: true,
-					    	Message: "Ids were set for new issues - pull to get updated repo",
+							Status:  true,
+							Message: "Ids were set for new issues - pull to get updated repo",
 						}
 					} else {
-						replyChannel <- RepoEventReply{ Status: true }
+						replyChannel <- RepoEventReply{Status: true}
 					}
 				}
 				irepo.closeExclusiveRepoConnection()
 			}
 		}
-	}()
+	}()*/
 }
 
 func NewGitRepo(repoPath string) IssueRepositoryInterface {
@@ -259,8 +258,8 @@ func (r *issueRepository) diff(oldOid *git.Oid, newOid *git.Oid) ExtendedCommitD
 		index++
 	}
 	return ExtendedCommitDiff{
-		CommitDiff : CommitDiff {
-			NewIssues: newIssues,
+		CommitDiff: CommitDiff{
+			NewIssues:      newIssues,
 			ModifiedIssues: modifiedIssues,
 		},
 		newIssuePathes: newIssuePathes,
@@ -320,7 +319,7 @@ func (r *issueRepository) GetIssues() ([]Issue, []time.Time) {
 		ientry, _ := idx.EntryByIndex(uint(i))
 		path := ientry.Path
 		id, _ := parseIssueIdFromRepoPath(path)
-		issue := Issue{ Id: id }
+		issue := Issue{Id: id}
 		parseIssuePropertiesFromRepoPath(path, &issue)
 		file, err := os.OpenFile(r.path+"/"+path, os.O_RDONLY, 0666)
 		if err != nil {
@@ -350,13 +349,13 @@ const delimiter string = "----------------------------------"
 
 func isNewIssueRepoPath(path string) bool {
 	split := strings.Split(path, "/")
-	last := split[len(split) - 1]
+	last := split[len(split)-1]
 	return strings.HasPrefix(last, "new_")
 }
 
 func parseIssueIdFromRepoPath(path string) (int, error) {
 	split := strings.Split(path, "/")
-	last := split[len(split) - 1]
+	last := split[len(split)-1]
 	if last[0] == '#' {
 		id, err := strconv.Atoi(last[1:])
 		if err != nil {
@@ -557,11 +556,11 @@ func (r *issueRepository) createMoveCommitForNewIssues(moves map[string]int) {
 	if err != nil {
 		panic(err)
 	}
-	for oldPath, id := range(moves) {
-		issue := Issue { Id: id	}
+	for oldPath, id := range moves {
+		issue := Issue{Id: id}
 		parseIssuePropertiesFromRepoPath(oldPath, &issue)
 		newPath := getIssueDir(issue) + getIssueFileName(issue)
-		err := os.Rename(r.path + "/" + oldPath, r.path + "/" + newPath)
+		err := os.Rename(r.path+"/"+oldPath, r.path+"/"+newPath)
 		if err != nil {
 			panic(err)
 		}
@@ -584,8 +583,8 @@ func (r *issueRepository) createMoveCommitForNewIssues(moves map[string]int) {
 	}
 	tree, err := repo.LookupTree(treeId)
 	if err != nil {
-		panic(err)	
-	}		
+		panic(err)
+	}
 	// get head commit
 	head, _ := repo.Head()
 	headCommit, err := repo.LookupCommit(head.Target())
