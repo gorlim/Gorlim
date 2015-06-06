@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/libgit2/git2go"
+	"gopkg.in/yaml.v2"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,55 +36,6 @@ var repoMap map[string]*issueRepository = make(map[string]*issueRepository)
 type ExtendedCommitDiff struct {
 	CommitDiff
 	newIssuePathes []string
-}
-
-func init() {
-	// listen to repo events
-	/*	go func() {
-		for {
-			for repoEvent := range listener.GetRepoEventChannel() {
-				replyChannel := repoEvent.Reply
-				irepo := repoMap[repoEvent.RepoPath]
-				if irepo.prePushHook == nil {
-					replyChannel <- RepoEventReply{Status: true}
-					continue
-				}
-				irepo.establishExclusiveRepoConnection()
-				oid, err := git.NewOid(repoEvent.Sha)
-				if err != nil {
-					irepo.closeExclusiveRepoConnection()
-					replyChannel <- RepoEventReply{Status: false, Message: "invalid commit SHA"}
-					continue
-				}
-				if repoEvent.Event == PrePushEvent {
-					head, _ := irepo.repo.Head()
-					diff := irepo.diff(head.Target(), oid)
-					if err, ids := irepo.prePushHook(diff.CommitDiff); err != nil {
-						replyChannel <- RepoEventReply{Status: false, Message: err.Error()}
-					} else {
-						move := make(map[string]int)
-						for i := 0; i < len(diff.newIssuePathes); i++ {
-							move[diff.newIssuePathes[i]] = ids[i]
-						}
-						irepo.pendingMoves = move
-						replyChannel <- RepoEventReply{Status: true}
-					}
-				} else if repoEvent.Event == PostPushEvent {
-					if len(irepo.pendingMoves) != 0 {
-						irepo.createMoveCommitForNewIssues(irepo.pendingMoves)
-						irepo.pendingMoves = nil
-						replyChannel <- RepoEventReply{
-							Status:  true,
-							Message: "Ids were set for new issues - pull to get updated repo",
-						}
-					} else {
-						replyChannel <- RepoEventReply{Status: true}
-					}
-				}
-				irepo.closeExclusiveRepoConnection()
-			}
-		}
-	}()*/
 }
 
 func NewGitRepo(repoPath string) IssueRepositoryInterface {
@@ -345,8 +298,6 @@ func readTextFile(file *os.File) []string {
 	return lines
 }
 
-const delimiter string = "----------------------------------"
-
 func isNewIssueRepoPath(path string) bool {
 	split := strings.Split(path, "/")
 	last := split[len(split)-1]
@@ -382,110 +333,65 @@ func parseIssuePropertiesFromRepoPath(path string, issue *Issue) {
 }
 
 func parseIssuePropertiesFromText(text []string, issue *Issue) bool {
-	i := 0
-	textLength := len(text)
-	// Parse Title
-	for ; i < textLength; i++ {
-		if strings.Contains(text[i], "Title:") {
-			issue.Title = strings.TrimSpace(strings.Split(text[i], ":")[1])
-			i++
-			break
-		}
-	}
-	if i == textLength {
-		panic("panic")
-		return false
-	}
-	// Parse Pull Request
-	for ; i < textLength; i++ {
-		if strings.Contains(text[i], "Patch:") {
-			issue.PullRequest = strings.TrimSpace(strings.Split(text[i], ":")[1])
-			i++
-			break
-		}
-	}
-	if i == textLength {
-		panic("panic")
-		return false
-	}
-	// Parse Labels
-	for ; i < textLength; i++ {
-		if strings.Contains(text[i], "Labels:") {
-			split := strings.Split(text[i], ":")
-			labels := strings.TrimSpace(split[1])
-			if len(labels) > 0 {
-				split = strings.Split(labels, ",")
-				for _, label := range split {
-					issue.Labels = append(issue.Labels, strings.TrimSpace(label))
-				}
-			}
-			i++
-			break
-		}
-	}
-	if i == textLength {
-		panic("panic")
-		return false
-	}
-	// Parse description
-	if text[i] == delimiter {
-		i++
+	join := strings.Join(text, "")
+	err := yaml.Unmarshal([]byte(join), issue)
+	return err == nil
+}
+
+var newLine = regexp.MustCompile("\r?\n")
+var specificYaml = regexp.MustCompile("[-:#?,{}\r\n\\[\\]]")
+
+func writeValue(b *bytes.Buffer, offset string, prefix string, value string) {
+	b.WriteString(offset)
+	b.WriteString(prefix)
+	if specificYaml.FindString(value) == "" {
+		b.WriteString(value)
 	} else {
-		panic("panic")
-		return false
-	}
-	for ; i < textLength; i++ {
-		if text[i] == delimiter {
-			break
+		b.WriteString("|")
+		newOffset := offset + "  "
+		for _, s := range newLine.Split(value, -1) {
+			b.WriteString("\n")
+			b.WriteString(newOffset)
+			b.WriteString(s)
 		}
-		issue.Description = issue.Description + text[i]
 	}
-	if i == textLength {
-		return true
-	}
-	// Parse comments
-	if text[i] == delimiter {
-		i++
+	b.WriteString("\n")
+}
+
+func writeValues(b *bytes.Buffer, offset string, prefix string, value []string, join string) {
+	b.WriteString(prefix)
+	if len(value) == 0 {
+		b.WriteString("[]")
+		b.WriteString("\n")
 	} else {
-		panic("panic")
-		return false
-	}
-	comment := ""
-	for ; i < textLength; i++ {
-		if text[i] == delimiter {
-			issue.Comments = append(issue.Comments, Comment{Text: comment})
-			comment = ""
-			continue
+		b.WriteString("\n")
+		newOffset := offset + "  "
+		for _, v := range value {
+			writeValue(b, newOffset, "- ", v)
+			b.WriteString(join)
 		}
-		comment = comment + text[i]
 	}
-	if comment != "" {
-		issue.Comments = append(issue.Comments, Comment{Text: comment})
-	}
-	return true
 }
 
 func issueToText(issue Issue) string {
-	var buffer bytes.Buffer
-	buffer.WriteString("Title: " + issue.Title + "\n\n")
-	buffer.WriteString("Patch: " + issue.PullRequest + "\n\n")
-	buffer.WriteString("Labels: ")
-	for i, label := range issue.Labels {
-		if i > 0 {
-			buffer.WriteString(", ")
-		}
-		buffer.WriteString(label)
+	buffer := &bytes.Buffer{}
+	writeValue(buffer, "", "title: ", issue.Title)
+	writeValue(buffer, "", "assignee: ", issue.Assignee)
+	writeValue(buffer, "", "milestone: ", issue.Milestone)
+	writeValue(buffer, "", "patch: ", issue.PullRequest)
+	writeValues(buffer, "", "labels: ", issue.Labels, "")
+	delim := "############################################################\n"
+	buffer.WriteString(delim)
+	writeValue(buffer, "", "body: ", issue.Description)
+	buffer.WriteString(delim)
+	length := len(issue.Comments)
+	comments := make([]string, length, length)
+	index := 0
+	for _, m := range issue.Comments {
+		comments[index] = m.Text
+		index++
 	}
-	buffer.WriteString("\n" + delimiter + "\n")
-	buffer.WriteString(issue.Description)
-	buffer.WriteString("\n" + delimiter + "\n")
-	for i, comment := range issue.Comments {
-		if i > 0 {
-			buffer.WriteString("\n" + delimiter + "\n")
-		}
-		buffer.WriteString(comment.Text)
-	}
-	buffer.WriteString("\n")
+	writeValues(buffer, "", "comments: ", comments, delim)
 	return buffer.String()
 }
 
@@ -510,7 +416,7 @@ func getIssueDir(issue Issue) string {
 }
 
 func getIssueFileName(issue Issue) string {
-	return "#" + strconv.Itoa(issue.Id)
+	return "#" + strconv.Itoa(issue.Id) + ".yml"
 }
 
 func mkIssueIdToPathMap(idx *git.Index) map[int]string {

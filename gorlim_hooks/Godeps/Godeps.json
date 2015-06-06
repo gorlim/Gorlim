@@ -1,0 +1,5 @@
+{
+	"ImportPath": "github.com/gorlim/Gorlim/gorlim_hooks",
+	"GoVersion": "go1.4.2",
+	"Deps": []
+}

@@ -4,6 +4,7 @@ SERVICE_NAME=gorlim_github
 DAEMON={{ bin }}/gorlim_github
 DAEMONOPTS="-github-client={{ github_client_id }} -github-secret={{ github_client_secret }} -root={{ git_root }} -port={{ github_port }} -db={{ db }}"
 USER={{ git_user }}
+PIDFILE={{ gorlim_github_pid }}
 
 if [ ! -x $DAEMON ]; then
   echo "ERROR: Can't execute $DAEMON."

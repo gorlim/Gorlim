@@ -9,17 +9,17 @@ type Comment struct {
 }
 
 type Issue struct {
-	Id          int
-	Opened      bool
-	Creator     string
-	At          *time.Time
-	ClosedAt    *time.Time
+	Id          int        `yaml:"-"`
+	Opened      bool       `yaml:"-"`
+	Creator     string     `yaml:"-"`
+	At          *time.Time `yaml:"-"`
+	ClosedAt    *time.Time `yaml:"-"`
+	Title       string
 	Assignee    string
 	Milestone   string
-	Title       string
-	Description string
-	PullRequest string
+	PullRequest string `yaml:"patch"`
 	Labels      []string
+	Description string `yaml:"body"`
 	Comments    []Comment
 }
 
@@ -64,4 +64,11 @@ func (issue Issue) Equals(other Issue) bool {
 		}
 	}
 	return true
+}
+
+func (v Comment) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	return unmarshal(v.Text)
+}
+func (v Comment) MarshalYAML() (interface{}, error) {
+	return v.Text, nil
 }
